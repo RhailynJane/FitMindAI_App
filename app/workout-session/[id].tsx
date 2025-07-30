@@ -32,7 +32,7 @@ export default function WorkoutSessionScreen() {
   }, [id]);
 
   useEffect(() => {
-    let timer: number;
+    let timer: ReturnType<typeof setTimeout>;
 
     if (isStarted && !isPaused && workout) {
       if (countdown > 0) {

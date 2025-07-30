@@ -6,37 +6,55 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: "#9512af",
+        tabBarInactiveTintColor: "#999",
         tabBarStyle: {
           backgroundColor: "white",
           borderTopWidth: 1,
-          borderTopColor: "#eee",
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          borderTopColor: "#f0f0f0",
+          height: 80,
+          paddingBottom: 20,
+          paddingTop: 10,
         },
-        tabBarActiveTintColor: "#9512af",
-        tabBarInactiveTintColor: "#ccc",
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600",
+          fontSize: 12,
+          fontWeight: "500",
         },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: "Workouts",
+          title: "Home",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="fitness-outline" size={size} color={color} />
+            <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="calendar"
+        name="workout"
         options={{
-          title: "Calendar",
+          title: "Workout",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+            <Ionicons name="fitness" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="workout-plans"
+        options={{
+          title: "Workout Plans",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="challenges"
+        options={{
+          title: "Challenges",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trending-up" size={size} color={color} />
           ),
         }}
       />
@@ -45,16 +63,7 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
