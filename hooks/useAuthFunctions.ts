@@ -5,187 +5,106 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
-  type User,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, firestore } from "../lib/firebase";
+import { useState } from "react";
+import { auth, db } from "../lib/firebase";
 
 export interface UserProfile {
-  id: string;
+  uid: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string;
-  age?: number;
-  height?: number;
-  weight?: number;
-  gender?: string;
-  fitnessGoal?: string;
-  fitnessLevel?: string;
-  workoutFrequency?: string;
+  displayName: string;
   createdAt: Date;
+  updatedAt: Date;
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const retryOperation = async (
-  operation: () => Promise<any>,
-  maxRetries = 3,
-  delayMs = 1000
-): Promise<any> => {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await operation();
-    } catch (error: any) {
-      console.log(`Attempt ${i + 1} failed:`, error.message);
-      if (i === maxRetries - 1) throw error;
-      await delay(delayMs * (i + 1)); // Exponential backoff
-    }
-  }
-  throw new Error("Max retries exceeded");
-};
-
 export const useAuthFunctions = () => {
+  const [loading, setLoading] = useState(false);
+
   const signUp = async (
     email: string,
     password: string,
     firstName: string,
     lastName: string
-  ): Promise<User> => {
+  ) => {
     try {
-      console.log("Creating user account with email:", email);
-      const { user } = await createUserWithEmailAndPassword(
+      setLoading(true);
+
+      // Create user with email and password
+      const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
-      console.log("User created successfully with ID:", user.uid);
+      const user = userCredential.user;
 
-      // Update display name
-      console.log(
-        "Updating user profile with name:",
-        `${firstName} ${lastName}`
-      );
-      await updateProfile(user, {
-        displayName: `${firstName} ${lastName}`,
-      });
-      console.log("User display name updated successfully");
+      // Update the user's display name
+      const displayName = `${firstName} ${lastName}`;
+      await updateProfile(user, { displayName });
 
-      // Create user profile in Firestore with retry logic
+      // Create user profile in Firestore
       const userProfile: UserProfile = {
-        id: user.uid,
+        uid: user.uid,
+        email: user.email!,
         firstName,
         lastName,
-        email,
+        displayName,
         createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      console.log("Creating user profile in Firestore...");
-      await retryOperation(() => {
-        return setDoc(doc(firestore, "users", user.uid), userProfile);
-      });
-      console.log("User profile created successfully in Firestore");
+      await setDoc(doc(db, "users", user.uid), userProfile);
 
       return user;
     } catch (error: any) {
-      console.error("Sign up error:", error.code, error.message);
-
-      // Provide more user-friendly error messages
-      let errorMessage = error.message;
-      if (error.code === "auth/email-already-in-use") {
-        errorMessage =
-          "This email is already registered. Please use a different email or try signing in.";
-      } else if (error.code === "auth/weak-password") {
-        errorMessage =
-          "Password is too weak. Please choose a stronger password.";
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Please enter a valid email address.";
-      } else if (error.code === "auth/network-request-failed") {
-        errorMessage =
-          "Network error. Please check your internet connection and try again.";
-      } else if (
-        error.message.includes("Firestore") ||
-        error.message.includes("transport")
-      ) {
-        errorMessage =
-          "There was an issue saving your profile. Your account was created successfully. Please try signing in.";
-      }
-
-      throw new Error(errorMessage);
+      console.error("Sign up error:", error);
+      throw new Error(error.message || "Failed to create account");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signIn = async (email: string, password: string): Promise<User> => {
+  const signIn = async (email: string, password: string) => {
     try {
-      console.log("Signing in user with email:", email);
-      const { user } = await signInWithEmailAndPassword(auth, email, password);
-      console.log("User signed in successfully:", user.uid);
-      return user;
+      setLoading(true);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      return userCredential.user;
     } catch (error: any) {
-      console.error("Sign in error:", error.code, error.message);
-
-      let errorMessage = error.message;
-      if (error.code === "auth/user-not-found") {
-        errorMessage =
-          "No account found with this email. Please check your email or create a new account.";
-      } else if (error.code === "auth/wrong-password") {
-        errorMessage = "Incorrect password. Please try again.";
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Please enter a valid email address.";
-      } else if (error.code === "auth/too-many-requests") {
-        errorMessage = "Too many failed attempts. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
+      console.error("Sign in error:", error);
+      throw new Error(error.message || "Failed to sign in");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = async (): Promise<void> => {
+  const logout = async () => {
     try {
-      console.log("Signing out user...");
+      setLoading(true);
       await signOut(auth);
-      console.log("User signed out successfully");
     } catch (error: any) {
-      console.error("Sign out error:", error.code, error.message);
-      throw error;
+      console.error("Logout error:", error);
+      throw new Error(error.message || "Failed to logout");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getUserProfile = async (
-    userId: string
-  ): Promise<UserProfile | null> => {
+  const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
-      console.log("Fetching user profile for ID:", userId);
-      const userDoc = await retryOperation(() => {
-        return getDoc(doc(firestore, "users", userId));
-      });
-
+      const userDoc = await getDoc(doc(db, "users", uid));
       if (userDoc.exists()) {
-        console.log("User profile found");
         return userDoc.data() as UserProfile;
       }
-      console.log("No user profile found");
       return null;
-    } catch (error: any) {
-      console.error("Get user profile error:", error.code, error.message);
-      throw error;
-    }
-  };
-
-  const updateUserProfile = async (
-    userId: string,
-    profileData: Partial<UserProfile>
-  ): Promise<void> => {
-    try {
-      console.log("Updating user profile for ID:", userId);
-      await retryOperation(() => {
-        return setDoc(doc(firestore, "users", userId), profileData, {
-          merge: true,
-        });
-      });
-      console.log("User profile updated successfully");
-    } catch (error: any) {
-      console.error("Update user profile error:", error.code, error.message);
-      throw error;
+    } catch (error) {
+      console.error("Error getting user profile:", error);
+      return null;
     }
   };
 
@@ -194,8 +113,6 @@ export const useAuthFunctions = () => {
     signIn,
     logout,
     getUserProfile,
-    updateUserProfile,
+    loading,
   };
 };
-
-export default useAuthFunctions;

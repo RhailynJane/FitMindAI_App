@@ -1,73 +1,74 @@
-"use client";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
-  SafeAreaView,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { exerciseApi, type Exercise } from "../../services/exerciseApi";
+import { SafeAreaView } from "react-native-safe-area-context";
+import OfflineMessage from "../../components/OfflineMessage";
+import {
+  ApiOfflineError,
+  exerciseApi,
+  type Exercise,
+} from "../../services/exerciseApi";
 
-export default function ExercisesScreen() {
+export default function ExercisesByBodyPart() {
   const { bodyPart } = useLocalSearchParams<{ bodyPart: string }>();
-  const router = useRouter();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [offlineMessage, setOfflineMessage] = useState("");
 
   useEffect(() => {
-    if (bodyPart) {
-      loadExercises();
-    }
+    loadExercises();
   }, [bodyPart]);
 
   const loadExercises = async () => {
+    if (!bodyPart) return;
+
     try {
       setLoading(true);
-      setError(null);
-      const exercisesData = await exerciseApi.getExercisesByBodyPart(
-        decodeURIComponent(bodyPart),
-        20
-      );
-
-      if (exercisesData.length === 0) {
-        setError(`No exercises found for ${decodeURIComponent(bodyPart)}`);
-        return;
+      setIsOffline(false);
+      const data = await exerciseApi.getExercisesByBodyPart(bodyPart);
+      setExercises(data);
+    } catch (error) {
+      if (error instanceof ApiOfflineError) {
+        setIsOffline(true);
+        setOfflineMessage(error.message);
+      } else {
+        setIsOffline(true);
+        setOfflineMessage(
+          "Exercise database is currently offline. We're working to restore the service."
+        );
       }
-
-      setExercises(exercisesData);
-    } catch (error: any) {
-      console.error("Error loading exercises:", error);
-      setError(error.message || "Failed to load exercises");
+      setExercises([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const viewExerciseDetails = (exercise: Exercise) => {
+  const handleExercisePress = (exercise: Exercise) => {
     router.push(`/exercise-details/${exercise.id}`);
+  };
+
+  const handleBackPress = () => {
+    router.back();
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {bodyPart
-              ? decodeURIComponent(bodyPart).charAt(0).toUpperCase() +
-                decodeURIComponent(bodyPart).slice(1)
-              : "Exercises"}
-          </Text>
-          <View style={{ width: 24 }} />
+          <Text style={styles.headerTitle}>Loading...</Text>
+          <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#9512af" />
@@ -77,94 +78,98 @@ export default function ExercisesScreen() {
     );
   }
 
-  if (error) {
+  if (isOffline) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {bodyPart
-              ? decodeURIComponent(bodyPart).charAt(0).toUpperCase() +
-                decodeURIComponent(bodyPart).slice(1)
-              : "Exercises"}
-          </Text>
-          <View style={{ width: 24 }} />
+          <Text style={styles.headerTitle}>Exercises</Text>
+          <View style={styles.placeholder} />
         </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color="#ff4444" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadExercises}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <OfflineMessage
+          title="Exercise Database Offline"
+          message={offlineMessage}
+        />
       </SafeAreaView>
     );
   }
 
+  const renderExercise = ({ item }: { item: Exercise }) => (
+    <TouchableOpacity
+      style={styles.exerciseCard}
+      onPress={() => handleExercisePress(item)}
+    >
+      <View style={styles.exerciseInfo}>
+        <Text style={styles.exerciseName}>{item.name}</Text>
+        <Text style={styles.exerciseTarget}>Target: {item.target}</Text>
+        <Text style={styles.exerciseEquipment}>
+          Equipment: {item.equipment}
+        </Text>
+        <View style={styles.badgeContainer}>
+          <View style={styles.bodyPartBadge}>
+            <Text style={styles.bodyPartText}>{item.bodyPart}</Text>
+          </View>
+          <View
+            style={[
+              styles.difficultyBadge,
+              { backgroundColor: getDifficultyColor(item.difficulty) },
+            ]}
+          >
+            <Text style={styles.difficultyText}>{item.difficulty}</Text>
+          </View>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#666" />
+    </TouchableOpacity>
+  );
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty.toLowerCase()) {
+      case "beginner":
+        return "#4CAF50";
+      case "intermediate":
+        return "#FF9800";
+      case "advanced":
+        return "#F44336";
+      default:
+        return "#9E9E9E";
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {bodyPart
-            ? decodeURIComponent(bodyPart).charAt(0).toUpperCase() +
-              decodeURIComponent(bodyPart).slice(1)
+            ? bodyPart.charAt(0).toUpperCase() + bodyPart.slice(1)
             : "Exercises"}
         </Text>
-        <View style={{ width: 24 }} />
+        <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <Text style={styles.exerciseCount}>
           {exercises.length} exercises found
         </Text>
-
-        {exercises.map((exercise) => (
-          <TouchableOpacity
-            key={exercise.id}
-            style={styles.exerciseCard}
-            onPress={() => viewExerciseDetails(exercise)}
-          >
-            <Image
-              source={{ uri: exercise.gifUrl }}
-              style={styles.exerciseImage}
-              defaultSource={{
-                uri: "https://via.placeholder.com/80x80/f0f0f0/999?text=Exercise",
-              }}
-            />
-            <View style={styles.exerciseInfo}>
-              <Text style={styles.exerciseName}>{exercise.name}</Text>
-              <Text style={styles.exerciseTarget}>
-                Target: {exercise.target}
-              </Text>
-              <Text style={styles.exerciseEquipment}>
-                Equipment: {exercise.equipment}
-              </Text>
-              <View style={styles.badgeContainer}>
-                <View style={styles.bodyPartBadge}>
-                  <Text style={styles.bodyPartText}>{exercise.bodyPart}</Text>
-                </View>
-                <View style={styles.difficultyBadge}>
-                  <Text style={styles.difficultyText}>
-                    {exercise.difficulty}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        <FlatList
+          data={exercises}
+          renderItem={renderExercise}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
@@ -178,10 +183,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f0f0f0",
   },
+  backButton: {
+    padding: 4,
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
+  },
+  placeholder: {
+    width: 32,
   },
   loadingContainer: {
     flex: 1,
@@ -193,38 +204,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: "#9512af",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  retryButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
   content: {
     flex: 1,
-    padding: 20,
   },
   exerciseCount: {
     fontSize: 14,
     color: "#666",
-    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  listContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   exerciseCard: {
     backgroundColor: "white",
@@ -238,13 +229,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-  },
-  exerciseImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: "#f0f0f0",
   },
   exerciseInfo: {
     flex: 1,
@@ -280,16 +264,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#9512af",
     fontWeight: "500",
+    textTransform: "capitalize",
   },
   difficultyBadge: {
-    backgroundColor: "#E8F5E8",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   difficultyText: {
     fontSize: 10,
-    color: "#4CAF50",
+    color: "white",
     fontWeight: "500",
   },
 });

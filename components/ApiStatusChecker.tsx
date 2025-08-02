@@ -1,135 +1,141 @@
 "use client";
+
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { exerciseApi } from "../services/exerciseApi";
 
 interface ApiStatusCheckerProps {
-  onStatusChange?: (isOnline: boolean) => void;
+  onStatusChange: (isOnline: boolean) => void;
 }
 
 export default function ApiStatusChecker({
   onStatusChange,
 }: ApiStatusCheckerProps) {
-  const [status, setStatus] = useState<
-    "checking" | "online" | "offline" | "error"
-  >("checking");
-  const [errorMessage, setErrorMessage] = useState<string>("");
-
-  const checkApiStatus = async () => {
-    try {
-      setStatus("checking");
-      setErrorMessage("");
-
-      const statusResponse = await exerciseApi.checkApiStatus();
-      console.log("API Status:", statusResponse);
-
-      setStatus("online");
-      onStatusChange?.(true);
-    } catch (error: any) {
-      console.error("API Status check failed:", error);
-      setStatus("error");
-      setErrorMessage(error.message || "Failed to connect to ExerciseDB API");
-      onStatusChange?.(false);
-    }
-  };
+  const [isOnline, setIsOnline] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     checkApiStatus();
   }, []);
 
-  const getStatusColor = () => {
-    switch (status) {
-      case "online":
-        return "#4CAF50";
-      case "offline":
-      case "error":
-        return "#FF4444";
-      case "checking":
-        return "#FFA726";
-      default:
-        return "#666";
+  const checkApiStatus = async () => {
+    try {
+      setIsChecking(true);
+      setErrorMessage(null);
+
+      // Try to make a simple request to the API
+      const response = await fetch(
+        "https://exercisedb.p.rapidapi.com/exercises/bodyPartList",
+        {
+          headers: {
+            "X-RapidAPI-Key":
+              process.env.EXPO_PUBLIC_EXERCISEDB_API_KEY || "test",
+            "X-RapidAPI-Host": "exercisedb.p.rapidapi.com",
+          },
+        }
+      );
+
+      if (response.ok) {
+        setIsOnline(true);
+        onStatusChange(true);
+        setErrorMessage(null);
+      } else {
+        setIsOnline(false);
+        onStatusChange(false);
+
+        if (response.status === 403) {
+          setErrorMessage("API key invalid or missing");
+        } else if (response.status === 429) {
+          setErrorMessage("Rate limit exceeded");
+        } else {
+          setErrorMessage(`API error: ${response.status}`);
+        }
+      }
+    } catch (error) {
+      console.log("API check failed:", error);
+      setIsOnline(false);
+      onStatusChange(false);
+      setErrorMessage("Connection failed");
+    } finally {
+      setIsChecking(false);
     }
   };
 
-  const getStatusIcon = () => {
-    switch (status) {
-      case "online":
-        return "checkmark-circle";
-      case "offline":
-      case "error":
-        return "alert-circle";
-      case "checking":
-        return "time";
-      default:
-        return "help-circle";
-    }
-  };
-
-  const getStatusText = () => {
-    switch (status) {
-      case "online":
-        return "ExerciseDB API Connected";
-      case "offline":
-        return "ExerciseDB API Offline";
-      case "error":
-        return "ExerciseDB API Error";
-      case "checking":
-        return "Checking API Status...";
-      default:
-        return "Unknown Status";
-    }
-  };
+  if (isChecking) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.checkingText}>Checking API status...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.statusRow}>
-        <Ionicons
-          name={getStatusIcon() as any}
-          size={16}
-          color={getStatusColor()}
-        />
-        <Text style={[styles.statusText, { color: getStatusColor() }]}>
-          {getStatusText()}
+    <View style={[styles.container, isOnline ? styles.online : styles.offline]}>
+      <Ionicons
+        name={isOnline ? "checkmark-circle" : "alert-circle"}
+        size={16}
+        color={isOnline ? "#4CAF50" : "#ff4444"}
+      />
+      <View style={styles.textContainer}>
+        <Text
+          style={[
+            styles.statusText,
+            isOnline ? styles.onlineText : styles.offlineText,
+          ]}
+        >
+          ExerciseDB API: {isOnline ? "Online" : "Offline"}
         </Text>
-        <TouchableOpacity onPress={checkApiStatus} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={14} color="#666" />
-        </TouchableOpacity>
+        {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
       </View>
-      {errorMessage ? (
-        <Text style={styles.errorMessage}>{errorMessage}</Text>
-      ) : null}
+      {!isOnline && (
+        <TouchableOpacity onPress={checkApiStatus} style={styles.retryButton}>
+          <Ionicons name="refresh" size={14} color="#ff4444" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "white",
-    padding: 12,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#f0f0f0",
-  },
-  statusRow: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  online: {
+    backgroundColor: "#E8F5E8",
+  },
+  offline: {
+    backgroundColor: "#FFEBEE",
+  },
+  textContainer: {
+    flex: 1,
+    marginLeft: 6,
   },
   statusText: {
     fontSize: 12,
     fontWeight: "500",
-    marginLeft: 6,
-    flex: 1,
   },
-  refreshButton: {
+  onlineText: {
+    color: "#4CAF50",
+  },
+  offlineText: {
+    color: "#ff4444",
+  },
+  errorText: {
+    fontSize: 10,
+    color: "#ff4444",
+    marginTop: 2,
+  },
+  checkingText: {
+    fontSize: 12,
+    color: "#666",
+  },
+  retryButton: {
     padding: 4,
-  },
-  errorMessage: {
-    fontSize: 11,
-    color: "#FF4444",
-    marginTop: 4,
-    lineHeight: 14,
   },
 });

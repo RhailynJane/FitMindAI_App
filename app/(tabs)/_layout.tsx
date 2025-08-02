@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { Platform, View } from "react-native";
 
 export default function TabLayout() {
   return (
@@ -8,17 +9,23 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: "#9512af",
         tabBarInactiveTintColor: "#999",
+        tabBarShowLabel: false, // Remove labels
         tabBarStyle: {
           backgroundColor: "white",
           borderTopWidth: 1,
           borderTopColor: "#f0f0f0",
-          height: 80,
-          paddingBottom: 20,
-          paddingTop: 10,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
+          height: Platform.OS === "ios" ? 80 : 100,
+          paddingBottom: Platform.OS === "ios" ? 20 : 8,
+          paddingTop: 8,
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
         },
       }}
     >
@@ -27,25 +34,50 @@ export default function TabLayout() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="home" size={size} color={color} />
+            </View>
           ),
         }}
       />
+
       <Tabs.Screen
         name="workout"
         options={{
           title: "Workout",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="fitness" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="fitness" size={size} color={color} />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="workout-plans"
         options={{
-          title: "Workout Plans",
+          title: "Plans",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="calendar" size={size} color={color} />
+            </View>
           ),
         }}
       />
@@ -54,7 +86,15 @@ export default function TabLayout() {
         options={{
           title: "Challenges",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trending-up" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="trophy" size={size} color={color} />
+            </View>
           ),
         }}
       />
@@ -63,7 +103,15 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="person" size={size} color={color} />
+            </View>
           ),
         }}
       />

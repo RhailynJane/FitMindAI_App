@@ -1,44 +1,36 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { AuthProvider } from "../hooks/useAuth";
 
 export default function RootLayout() {
   return (
-    <>
-      <StatusBar style="dark" />
-      <View style={{ flex: 1, backgroundColor: "#efdff1" }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen name="welcome" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen name="signup" options={{ headerShown: false }} />
-          <Stack.Screen name="profile-setup" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="goal-selection"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="signin" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="welcome-success"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="exercises/[bodyPart]"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="exercise-details/[id]"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="workout/[id]" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="workout-complete"
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen name="ai-chat" options={{ headerShown: false }} />
+    <SafeAreaProvider>
+      <AuthProvider>
+        <StatusBar style="dark" backgroundColor="#ffffff" />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: "#f8f9fa" },
+          }}
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="welcome" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="signup" />
+          <Stack.Screen name="profile-setup" />
+          <Stack.Screen name="goal-selection" />
+          <Stack.Screen name="signin" />
+          <Stack.Screen name="welcome-success" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="exercises/[bodyPartName]" />
+          <Stack.Screen name="exercise-details/[exerciseId]" />
+          <Stack.Screen name="workout/[workoutId]" />
+          <Stack.Screen name="workout-complete" />
+          <Stack.Screen name="workout-session/[sessionId]" />
+          <Stack.Screen name="ai-chat" />
         </Stack>
-      </View>
-    </>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

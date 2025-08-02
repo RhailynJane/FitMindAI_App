@@ -1,16 +1,16 @@
-"use client";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../hooks/useAuth";
 import {
   firestoreService,
@@ -20,6 +20,7 @@ import {
 export default function WorkoutPlansScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [workouts, setWorkouts] = useState<UserWorkout[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +37,7 @@ export default function WorkoutPlansScreen() {
       setLoading(true);
       const userWorkouts = await firestoreService.getUserWorkouts(user.uid);
       setWorkouts(userWorkouts);
+      console.log("Loaded workouts:", userWorkouts.length);
     } catch (error) {
       console.error("Error loading workouts:", error);
     } finally {
@@ -60,8 +62,13 @@ export default function WorkoutPlansScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              console.log("Deleting workout:", workoutId);
               await firestoreService.deleteUserWorkout(workoutId);
-              setWorkouts(workouts.filter((w) => w.id !== workoutId));
+              // Update local state immediately for better UX
+              setWorkouts((prevWorkouts) =>
+                prevWorkouts.filter((w) => w.id !== workoutId)
+              );
+              console.log("Workout deleted successfully");
             } catch (error) {
               console.error("Error deleting workout:", error);
               Alert.alert(
@@ -79,6 +86,7 @@ export default function WorkoutPlansScreen() {
     if (!user) return;
 
     try {
+      console.log("Starting workout:", workout.name);
       const sessionId = await firestoreService.startWorkoutSession(
         user.uid,
         workout.id,
@@ -93,19 +101,19 @@ export default function WorkoutPlansScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Workout Plans</Text>
         </View>
         <View style={styles.loadingContainer}>
           <Text>Loading your workouts...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Workout Plans</Text>
         <TouchableOpacity
@@ -116,7 +124,13 @@ export default function WorkoutPlansScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: Platform.OS === "ios" ? 100 : 80,
+        }}
+      >
         {workouts.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="fitness-outline" size={64} color="#ccc" />
@@ -196,7 +210,7 @@ export default function WorkoutPlansScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -304,7 +318,9 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   deleteButton: {
-    padding: 4,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: "#fff5f5",
   },
   exercisesList: {
     marginBottom: 12,

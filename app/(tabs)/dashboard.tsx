@@ -5,13 +5,14 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Dimensions,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../hooks/useAuth";
 import {
   useAuthFunctions,
@@ -72,13 +73,16 @@ export default function Dashboard() {
     fetchUserData();
   }, [user]);
 
-  // Set up real-time listeners
+  // Set up real-time listeners for stats updates
   useEffect(() => {
     if (!user) return;
+
+    console.log("Setting up real-time listeners for user:", user.uid);
 
     const unsubscribeStats = firestoreService.subscribeToUserStats(
       user.uid,
       (stats) => {
+        console.log("Stats updated:", stats);
         setUserStats(stats);
       }
     );
@@ -86,11 +90,13 @@ export default function Dashboard() {
     const unsubscribeChallenges = firestoreService.subscribeToUserChallenges(
       user.uid,
       (challenges) => {
+        console.log("Challenges updated:", challenges.length);
         setUserChallenges(challenges);
       }
     );
 
     return () => {
+      console.log("Cleaning up real-time listeners");
       unsubscribeStats();
       unsubscribeChallenges();
     };
@@ -152,7 +158,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
           <Text>Loading...</Text>
         </View>
@@ -161,8 +167,14 @@ export default function Dashboard() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: Platform.OS === "ios" ? 100 : 80,
+        }}
+      >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.menuButton}>
@@ -361,16 +373,13 @@ export default function Dashboard() {
             )}
           </View>
         </View>
-
-        {/* Bottom Spacing */}
-        <View style={styles.bottomSpacing} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
@@ -389,6 +398,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: "white",
+    marginBottom: 8,
   },
   menuButton: {
     padding: 4,
@@ -692,8 +702,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#999",
     textAlign: "center",
-  },
-  bottomSpacing: {
-    height: 20,
   },
 });

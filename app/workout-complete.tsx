@@ -1,6 +1,7 @@
 "use client";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   SafeAreaView,
   StyleSheet,
@@ -8,9 +9,61 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../hooks/useAuth";
+import { firestoreService } from "../services/firestoreService";
+
+interface WorkoutStats {
+  duration: number;
+  calories: number;
+  exercises: number;
+}
 
 export default function WorkoutCompleteScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const params = useLocalSearchParams();
+  const [stats, setStats] = useState<WorkoutStats>({
+    duration: 15,
+    calories: 150,
+    exercises: 4,
+  });
+
+  useEffect(() => {
+    // If we have session data from params, use it
+    if (params.duration) {
+      setStats({
+        duration: Number.parseInt(params.duration as string) || 15,
+        calories: Number.parseInt(params.calories as string) || 150,
+        exercises: Number.parseInt(params.exercises as string) || 4,
+      });
+    }
+
+    // Complete the workout session if we have a sessionId
+    if (params.sessionId && user) {
+      completeWorkoutSession();
+    }
+  }, [params, user]);
+
+  const completeWorkoutSession = async () => {
+    try {
+      if (params.sessionId) {
+        console.log("Completing workout session:", params.sessionId);
+        await firestoreService.completeWorkoutSession(
+          params.sessionId as string,
+          stats.duration
+        );
+        console.log("Workout session completed successfully");
+      }
+    } catch (error) {
+      console.error("Error completing workout session:", error);
+    }
+  };
+
+  const formatDuration = (minutes: number) => {
+    const mins = Math.floor(minutes);
+    const secs = Math.floor((minutes - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -26,25 +79,29 @@ export default function WorkoutCompleteScreen() {
             <Ionicons name="checkmark-circle" size={80} color="#9512af" />
           </View>
           <Text style={styles.completedTitle}>Workout Completed!</Text>
-          <Text style={styles.completedSubtitle}>You've crushed it today!</Text>
+          <Text style={styles.completedSubtitle}>
+            You&#39;ve crushed it today!
+          </Text>
         </View>
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Ionicons name="time-outline" size={24} color="#9512af" />
-            <Text style={styles.statValue}>15:00</Text>
+            <Text style={styles.statValue}>
+              {formatDuration(stats.duration)}
+            </Text>
             <Text style={styles.statLabel}>Duration</Text>
           </View>
 
           <View style={styles.statItem}>
             <Ionicons name="flame-outline" size={24} color="#9512af" />
-            <Text style={styles.statValue}>150</Text>
+            <Text style={styles.statValue}>{stats.calories}</Text>
             <Text style={styles.statLabel}>Calories</Text>
           </View>
 
           <View style={styles.statItem}>
             <Ionicons name="fitness-outline" size={24} color="#9512af" />
-            <Text style={styles.statValue}>4</Text>
+            <Text style={styles.statValue}>{stats.exercises}</Text>
             <Text style={styles.statLabel}>Exercises</Text>
           </View>
         </View>

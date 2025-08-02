@@ -1,6 +1,5 @@
-// Using ExerciseDB API through RapidAPI Gateway
-const EXERCISE_API_KEY = process.env.EXPO_PUBLIC_EXERCISE_API_KEY || "";
-const EXERCISE_API_HOST = "exercisedb.p.rapidapi.com";
+const EXERCISEDB_API_KEY = process.env.EXPO_PUBLIC_EXERCISEDB_API_KEY ?? "";
+const BASE_URL = "https://exercisedb.p.rapidapi.com";
 
 export interface Exercise {
   id: string;
@@ -8,217 +7,143 @@ export interface Exercise {
   bodyPart: string;
   target: string;
   equipment: string;
-  secondaryMuscles: string[];
-  instructions: string[];
-  description: string;
-  difficulty: "beginner" | "intermediate" | "advanced";
-  category:
-    | "strength"
-    | "cardio"
-    | "mobility"
-    | "balance"
-    | "stretching"
-    | "plyometrics"
-    | "rehabilitation";
-  gifUrl?: string;
+  gifUrl: string;
+  instructions?: string[];
+  secondaryMuscles?: string[];
+  difficulty: string;
+  category: string;
+  description?: string;
 }
 
-class ExerciseApiService {
-  private baseUrl = "https://exercisedb.p.rapidapi.com";
-  private cache = new Map<string, any>();
-  private lastApiCall = 0;
-  private minApiInterval = 100;
+export class ApiOfflineError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiOfflineError";
+  }
+}
 
-  private async fetchWithHeaders(url: string) {
-    // Rate limiting
-    const now = Date.now();
-    if (now - this.lastApiCall < this.minApiInterval) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.minApiInterval - (now - this.lastApiCall))
-      );
-    }
-    this.lastApiCall = Date.now();
-
-    // Check cache first
-    const cacheKey = url;
-    if (this.cache.has(cacheKey)) {
-      console.log("Using cached data for:", url);
-      return this.cache.get(cacheKey);
-    }
-
-    if (!EXERCISE_API_KEY) {
-      throw new Error(
-        "ExerciseDB API key is not configured. Please add EXPO_PUBLIC_EXERCISE_API_KEY to your environment variables."
-      );
-    }
-
+class ExerciseApi {
+  private async fetchWithAuth(url: string): Promise<any> {
     try {
-      console.log("Fetching from ExerciseDB API:", url);
       const response = await fetch(url, {
         headers: {
-          "X-RapidAPI-Key": EXERCISE_API_KEY,
-          "X-RapidAPI-Host": EXERCISE_API_HOST,
+          "X-RapidAPI-Key": EXERCISEDB_API_KEY,
+          "X-RapidAPI-Host": "exercisedb.p.rapidapi.com",
         },
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error(
-            "Invalid API key or not subscribed to ExerciseDB API. Please check your RapidAPI subscription."
+        if (response.status === 403) {
+          throw new ApiOfflineError(
+            "Exercise database is currently offline. We're working to restore the service."
           );
-        } else if (response.status === 403) {
-          throw new Error(
-            "Access forbidden. Please verify your API key and subscription status."
-          );
-        } else if (response.status === 429) {
-          throw new Error("Rate limit exceeded. Please try again later.");
         }
-        throw new Error(
-          `API Error: ${response.status} - ${response.statusText}`
+        if (response.status === 429) {
+          throw new ApiOfflineError(
+            "Exercise database is currently experiencing high traffic. We're working to restore normal service."
+          );
+        }
+        throw new ApiOfflineError(
+          "Exercise database is currently offline. We're working to restore the service."
         );
       }
 
-      const data = await response.json();
-
-      // Cache the successful response for 5 minutes
-      this.cache.set(cacheKey, data);
-      setTimeout(() => this.cache.delete(cacheKey), 5 * 60 * 1000);
-
-      console.log("Successfully fetched and cached data");
-      return data;
+      return response.json();
     } catch (error) {
-      console.error("ExerciseDB API Error:", error);
-      throw error;
-    }
-  }
-
-  // Check API status
-  async checkApiStatus(): Promise<string> {
-    try {
-      const response = await fetch(`${this.baseUrl}/status`, {
-        headers: {
-          "X-RapidAPI-Key": EXERCISE_API_KEY,
-          "X-RapidAPI-Host": EXERCISE_API_HOST,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Status check failed: ${response.status}`);
+      console.error("API fetch error:", error);
+      if (error instanceof ApiOfflineError) {
+        throw error;
       }
+      throw new ApiOfflineError(
+        "Exercise database is currently offline. We're working to restore the service."
+      );
+    }
+  }
 
-      return await response.text();
+  async getBodyParts(): Promise<string[]> {
+    try {
+      const data = await this.fetchWithAuth(
+        `${BASE_URL}/exercises/bodyPartList`
+      );
+      return data || [];
     } catch (error) {
-      console.error("API Status check failed:", error);
+      console.error("Error fetching body parts:", error);
       throw error;
     }
   }
 
-  // Get all exercises with optional limit and offset
-  async getAllExercises(limit = 20, offset = 0): Promise<Exercise[]> {
-    const url = `${this.baseUrl}/exercises?limit=${limit}&offset=${offset}`;
-    const data = await this.fetchWithHeaders(url);
-    return data.map((exercise: any) => this.transformExercise(exercise));
-  }
-
-  // Get exercises by body part
   async getExercisesByBodyPart(
     bodyPart: string,
-    limit = 10
+    limit = 20
   ): Promise<Exercise[]> {
-    const url = `${this.baseUrl}/exercises/bodyPart/${encodeURIComponent(
-      bodyPart
-    )}`;
-    const data = await this.fetchWithHeaders(url);
-    return data
-      .slice(0, limit)
-      .map((exercise: any) => this.transformExercise(exercise));
-  }
-
-  // Get exercises by target muscle
-  async getExercisesByTarget(target: string, limit = 10): Promise<Exercise[]> {
-    const url = `${this.baseUrl}/exercises/target/${encodeURIComponent(
-      target
-    )}`;
-    const data = await this.fetchWithHeaders(url);
-    return data
-      .slice(0, limit)
-      .map((exercise: any) => this.transformExercise(exercise));
-  }
-
-  // Get exercises by equipment
-  async getExercisesByEquipment(
-    equipment: string,
-    limit = 10
-  ): Promise<Exercise[]> {
-    const url = `${this.baseUrl}/exercises/equipment/${encodeURIComponent(
-      equipment
-    )}`;
-    const data = await this.fetchWithHeaders(url);
-    return data
-      .slice(0, limit)
-      .map((exercise: any) => this.transformExercise(exercise));
-  }
-
-  // Get specific exercise by ID
-  async getExerciseById(id: string): Promise<Exercise | null> {
     try {
-      const url = `${this.baseUrl}/exercises/exercise/${id}`;
-      const data = await this.fetchWithHeaders(url);
-      return this.transformExercise(data);
+      const data = await this.fetchWithAuth(
+        `${BASE_URL}/exercises/bodyPart/${bodyPart}?limit=${limit}`
+      );
+
+      return data.map((exercise: any) => ({
+        id: exercise.id,
+        name: exercise.name,
+        bodyPart: exercise.bodyPart,
+        target: exercise.target,
+        equipment: exercise.equipment,
+        gifUrl: exercise.gifUrl,
+        instructions: exercise.instructions || [],
+        secondaryMuscles: exercise.secondaryMuscles || [],
+        difficulty: this.getDifficulty(exercise.equipment),
+        category: exercise.bodyPart,
+        description: `A ${exercise.bodyPart} exercise targeting ${exercise.target} using ${exercise.equipment}.`,
+      })) as Exercise[];
     } catch (error) {
-      console.error(`Exercise with ID ${id} not found:`, error);
-      return null;
+      console.error("Error fetching exercises by body part:", error);
+      throw error;
     }
   }
 
-  // Get exercises by name (search)
-  async getExercisesByName(name: string, limit = 10): Promise<Exercise[]> {
-    const url = `${this.baseUrl}/exercises/name/${encodeURIComponent(name)}`;
-    const data = await this.fetchWithHeaders(url);
-    return data
-      .slice(0, limit)
-      .map((exercise: any) => this.transformExercise(exercise));
+  async getExerciseById(id: string): Promise<Exercise> {
+    try {
+      const data = await this.fetchWithAuth(
+        `${BASE_URL}/exercises/exercise/${id}`
+      );
+
+      return {
+        id: data.id,
+        name: data.name,
+        bodyPart: data.bodyPart,
+        target: data.target,
+        equipment: data.equipment,
+        gifUrl: data.gifUrl,
+        instructions: data.instructions || [],
+        secondaryMuscles: data.secondaryMuscles || [],
+        difficulty: this.getDifficulty(data.equipment),
+        category: data.bodyPart,
+        description: `A ${data.bodyPart} exercise targeting ${data.target} using ${data.equipment}.`,
+      };
+    } catch (error) {
+      console.error("Error fetching exercise by ID:", error);
+      throw error;
+    }
   }
 
-  // Get list of body parts
-  async getBodyParts(): Promise<string[]> {
-    const url = `${this.baseUrl}/exercises/bodyPartList`;
-    return await this.fetchWithHeaders(url);
-  }
+  private getDifficulty(equipment: string): string {
+    const bodyWeightEquipment = ["body weight", "assisted"];
+    const beginnerEquipment = ["dumbbell", "kettlebell", "resistance band"];
+    const intermediateEquipment = ["barbell", "cable", "smith machine"];
+    const advancedEquipment = ["olympic barbell", "trap bar"];
 
-  // Get list of target muscles
-  async getTargetMuscles(): Promise<string[]> {
-    const url = `${this.baseUrl}/exercises/targetList`;
-    return await this.fetchWithHeaders(url);
-  }
+    if (bodyWeightEquipment.includes(equipment.toLowerCase()))
+      return "Beginner";
+    if (beginnerEquipment.some((eq) => equipment.toLowerCase().includes(eq)))
+      return "Beginner";
+    if (
+      intermediateEquipment.some((eq) => equipment.toLowerCase().includes(eq))
+    )
+      return "Intermediate";
+    if (advancedEquipment.some((eq) => equipment.toLowerCase().includes(eq)))
+      return "Advanced";
 
-  // Get list of equipment
-  async getEquipmentList(): Promise<string[]> {
-    const url = `${this.baseUrl}/exercises/equipmentList`;
-    return await this.fetchWithHeaders(url);
-  }
-
-  private transformExercise(apiExercise: any): Exercise {
-    return {
-      id: apiExercise.id,
-      name: apiExercise.name,
-      bodyPart: apiExercise.bodyPart,
-      target: apiExercise.target,
-      equipment: apiExercise.equipment,
-      secondaryMuscles: apiExercise.secondaryMuscles || [],
-      instructions: apiExercise.instructions || [],
-      description: apiExercise.description || "",
-      difficulty: apiExercise.difficulty || "beginner",
-      category: apiExercise.category || "strength",
-      gifUrl:
-        apiExercise.gifUrl || this.generatePlaceholderUrl(apiExercise.name),
-    };
-  }
-
-  private generatePlaceholderUrl(exerciseName: string): string {
-    const cleanName = exerciseName.replace(/\s+/g, "%20");
-    return `/placeholder.svg?height=300&width=300&text=${cleanName}`;
+    return "Intermediate";
   }
 }
 
-export const exerciseApi = new ExerciseApiService();
+export const exerciseApi = new ExerciseApi();

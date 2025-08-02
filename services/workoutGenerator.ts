@@ -4,249 +4,333 @@ export interface WorkoutExercise {
   exercise: Exercise;
   sets: number;
   reps: number;
-  duration?: number; // in seconds for cardio
-  restTime: number; // in seconds
+  duration?: number;
+  restTime: number;
 }
 
 export interface GeneratedWorkout {
   id: string;
   name: string;
   description: string;
-  duration: number; // in minutes
-  difficulty: "beginner" | "intermediate" | "advanced";
-  targetBodyParts: string[];
+  duration: number;
+  difficulty: string;
   exercises: WorkoutExercise[];
+  category: string;
 }
 
 export interface WorkoutPreferences {
-  duration: number; // in minutes
+  duration: number;
   difficulty: "Beginner" | "Intermediate" | "Advanced";
   bodyParts: string[];
   equipment: string[];
   fitnessGoal: "weight_loss" | "muscle_gain" | "endurance" | "strength";
 }
 
-class WorkoutGeneratorService {
+class WorkoutGenerator {
   async generateWorkout(
     preferences: WorkoutPreferences
   ): Promise<GeneratedWorkout> {
-    const exercises = await this.getExercisesForWorkout(preferences);
+    try {
+      const exercises: Exercise[] = [];
 
-    if (exercises.length === 0) {
-      throw new Error(
-        "No exercises found for the specified preferences. Please try different body parts or equipment."
+      // Get exercises for each body part
+      for (const bodyPart of preferences.bodyParts) {
+        const bodyPartExercises = await exerciseApi.getExercisesByBodyPart(
+          bodyPart,
+          5
+        );
+        exercises.push(...bodyPartExercises.slice(0, 2));
+      }
+
+      // Filter by difficulty and equipment
+      const filteredExercises = exercises.filter((exercise) => {
+        const matchesDifficulty =
+          exercise.difficulty === preferences.difficulty;
+        const matchesEquipment = preferences.equipment.some((eq) =>
+          exercise.equipment.toLowerCase().includes(eq.toLowerCase())
+        );
+        return matchesDifficulty || matchesEquipment;
+      });
+
+      // Create workout exercises with sets/reps based on goal
+      const workoutExercises: WorkoutExercise[] = filteredExercises.map(
+        (exercise) => {
+          const { sets, reps, duration, restTime } = this.getExerciseParameters(
+            exercise,
+            preferences.fitnessGoal,
+            preferences.difficulty
+          );
+
+          return {
+            exercise,
+            sets,
+            reps,
+            duration,
+            restTime,
+          };
+        }
       );
+
+      const workout: GeneratedWorkout = {
+        id: `workout_${Date.now()}`,
+        name: this.generateWorkoutName(preferences),
+        description: this.generateWorkoutDescription(preferences),
+        duration: preferences.duration,
+        difficulty: preferences.difficulty,
+        exercises: workoutExercises,
+        category: preferences.bodyParts.join(", "),
+      };
+
+      return workout;
+    } catch (error) {
+      console.error("Error generating workout:", error);
+      return this.getFallbackWorkout(preferences);
     }
-
-    const workoutExercises = this.createWorkoutStructure(
-      exercises,
-      preferences
-    );
-
-    return {
-      id: Date.now().toString(),
-      name: this.generateWorkoutName(preferences),
-      description: this.generateWorkoutDescription(preferences),
-      duration: preferences.duration,
-      difficulty: preferences.difficulty.toLowerCase() as
-        | "beginner"
-        | "intermediate"
-        | "advanced",
-      targetBodyParts: preferences.bodyParts,
-      exercises: workoutExercises,
-    };
   }
 
   async getQuickWorkouts(): Promise<GeneratedWorkout[]> {
-    const quickWorkoutConfigs = [
+    const quickWorkouts: GeneratedWorkout[] = [
       {
+        id: "quick_1",
+        name: "Morning Energy Boost",
+        description: "A quick 15-minute workout to energize your morning",
         duration: 15,
-        difficulty: "Beginner" as const,
-        bodyParts: ["chest", "upper legs"],
-        equipment: ["body weight"],
-        fitnessGoal: "weight_loss" as const,
+        difficulty: "Beginner",
+        category: "Full Body",
+        exercises: [
+          {
+            exercise: {
+              id: "jumping_jacks",
+              name: "Jumping Jacks",
+              bodyPart: "cardio",
+              target: "cardiovascular system",
+              equipment: "body weight",
+              gifUrl:
+                "/placeholder.svg?height=300&width=300&text=Jumping+Jacks",
+              difficulty: "Beginner",
+              category: "cardio",
+            },
+            sets: 3,
+            reps: 20,
+            restTime: 30,
+          },
+          {
+            exercise: {
+              id: "push_ups",
+              name: "Push-ups",
+              bodyPart: "chest",
+              target: "pectorals",
+              equipment: "body weight",
+              gifUrl: "/placeholder.svg?height=300&width=300&text=Push-ups",
+              difficulty: "Beginner",
+              category: "chest",
+            },
+            sets: 3,
+            reps: 10,
+            restTime: 45,
+          },
+          {
+            exercise: {
+              id: "squats",
+              name: "Squats",
+              bodyPart: "upper legs",
+              target: "quadriceps",
+              equipment: "body weight",
+              gifUrl: "/placeholder.svg?height=300&width=300&text=Squats",
+              difficulty: "Beginner",
+              category: "upper legs",
+            },
+            sets: 3,
+            reps: 15,
+            restTime: 45,
+          },
+        ],
       },
       {
+        id: "quick_2",
+        name: "HIIT Blast",
+        description: "High-intensity interval training for maximum results",
+        duration: 12,
+        difficulty: "Intermediate",
+        category: "HIIT",
+        exercises: [
+          {
+            exercise: {
+              id: "burpees",
+              name: "Burpees",
+              bodyPart: "cardio",
+              target: "cardiovascular system",
+              equipment: "body weight",
+              gifUrl: "/placeholder.svg?height=300&width=300&text=Burpees",
+              difficulty: "Intermediate",
+              category: "cardio",
+            },
+            sets: 4,
+            reps: 8,
+            restTime: 30,
+          },
+          {
+            exercise: {
+              id: "mountain_climbers",
+              name: "Mountain Climbers",
+              bodyPart: "cardio",
+              target: "cardiovascular system",
+              equipment: "body weight",
+              gifUrl:
+                "/placeholder.svg?height=300&width=300&text=Mountain+Climbers",
+              difficulty: "Intermediate",
+              category: "cardio",
+            },
+            sets: 4,
+            reps: 20,
+            restTime: 30,
+          },
+        ],
+      },
+      {
+        id: "quick_3",
+        name: "Core Strength",
+        description: "Build a strong core with targeted exercises",
         duration: 20,
-        difficulty: "Intermediate" as const,
-        bodyParts: ["cardio", "waist"],
-        equipment: ["body weight"],
-        fitnessGoal: "endurance" as const,
-      },
-      {
-        duration: 25,
-        difficulty: "Advanced" as const,
-        bodyParts: ["upper arms", "chest", "back"],
-        equipment: ["body weight"],
-        fitnessGoal: "strength" as const,
+        difficulty: "All Levels",
+        category: "Core",
+        exercises: [
+          {
+            exercise: {
+              id: "plank",
+              name: "Plank",
+              bodyPart: "waist",
+              target: "abs",
+              equipment: "body weight",
+              gifUrl: "/placeholder.svg?height=300&width=300&text=Plank",
+              difficulty: "Beginner",
+              category: "waist",
+            },
+            sets: 3,
+            reps: 0,
+            duration: 30,
+            restTime: 60,
+          },
+          {
+            exercise: {
+              id: "crunches",
+              name: "Crunches",
+              bodyPart: "waist",
+              target: "abs",
+              equipment: "body weight",
+              gifUrl: "/placeholder.svg?height=300&width=300&text=Crunches",
+              difficulty: "Beginner",
+              category: "waist",
+            },
+            sets: 3,
+            reps: 20,
+            restTime: 45,
+          },
+        ],
       },
     ];
 
-    const workouts: GeneratedWorkout[] = [];
-
-    for (const config of quickWorkoutConfigs) {
-      try {
-        const workout = await this.generateWorkout(config);
-        workouts.push(workout);
-      } catch (error) {
-        console.error(`Failed to generate workout for config:`, config, error);
-        // Skip this workout if it fails, don't add fallback
-      }
-    }
-
-    if (workouts.length === 0) {
-      throw new Error(
-        "Unable to generate any workouts. Please check your API connection and try again."
-      );
-    }
-
-    return workouts;
+    return quickWorkouts;
   }
 
-  private async getExercisesForWorkout(
-    preferences: WorkoutPreferences
-  ): Promise<Exercise[]> {
-    const allExercises: Exercise[] = [];
+  private getExerciseParameters(
+    exercise: Exercise,
+    goal: string,
+    difficulty: string
+  ): { sets: number; reps: number; duration?: number; restTime: number } {
+    const isCardio = exercise.bodyPart === "cardio";
 
-    // Get exercises for each target body part
-    for (const bodyPart of preferences.bodyParts) {
-      try {
-        const exercises = await exerciseApi.getExercisesByBodyPart(bodyPart, 5);
-        allExercises.push(...exercises);
-      } catch (error) {
-        console.error(
-          `Failed to get exercises for body part: ${bodyPart}`,
-          error
-        );
-        // Continue with other body parts
-      }
-    }
-
-    if (allExercises.length === 0) {
-      throw new Error(
-        `No exercises found for body parts: ${preferences.bodyParts.join(", ")}`
-      );
-    }
-
-    // Filter by equipment if specified
-    const filteredExercises =
-      preferences.equipment.length > 0
-        ? allExercises.filter((exercise) =>
-            preferences.equipment.some((equipment) =>
-              exercise.equipment.toLowerCase().includes(equipment.toLowerCase())
-            )
-          )
-        : allExercises;
-
-    // Remove duplicates
-    const uniqueExercises = filteredExercises.filter(
-      (exercise, index, self) =>
-        index === self.findIndex((e) => e.id === exercise.id)
-    );
-
-    return uniqueExercises.slice(
-      0,
-      this.getExerciseCount(preferences.duration)
-    );
-  }
-
-  private createWorkoutStructure(
-    exercises: Exercise[],
-    preferences: WorkoutPreferences
-  ): WorkoutExercise[] {
-    return exercises.map((exercise) => {
-      const isCardio = exercise.bodyPart === "cardio";
-
+    if (isCardio) {
       return {
-        exercise,
-        sets: isCardio ? 1 : this.getSetsForDifficulty(preferences.difficulty),
-        reps: isCardio ? 0 : this.getRepsForDifficulty(preferences.difficulty),
-        duration: isCardio
-          ? this.getCardioDuration(preferences.difficulty)
-          : undefined,
-        restTime: this.getRestTime(preferences.difficulty),
+        sets: 3,
+        reps: 0,
+        duration: goal === "endurance" ? 45 : 30,
+        restTime: 60,
       };
-    });
-  }
-
-  private getExerciseCount(duration: number): number {
-    if (duration <= 15) return 4;
-    if (duration <= 25) return 6;
-    if (duration <= 35) return 8;
-    return 10;
-  }
-
-  private getSetsForDifficulty(difficulty: string): number {
-    const normalizedDifficulty = difficulty.toLowerCase();
-    switch (normalizedDifficulty) {
-      case "beginner":
-        return 2;
-      case "intermediate":
-        return 3;
-      case "advanced":
-        return 4;
-      default:
-        return 3;
     }
-  }
 
-  private getRepsForDifficulty(difficulty: string): number {
-    const normalizedDifficulty = difficulty.toLowerCase();
-    switch (normalizedDifficulty) {
-      case "beginner":
-        return 10;
-      case "intermediate":
-        return 15;
-      case "advanced":
-        return 20;
-      default:
-        return 12;
-    }
-  }
+    const baseParams = {
+      weight_loss: { sets: 3, reps: 15, restTime: 45 },
+      muscle_gain: { sets: 4, reps: 8, restTime: 90 },
+      endurance: { sets: 3, reps: 20, restTime: 30 },
+      strength: { sets: 5, reps: 5, restTime: 120 },
+    };
 
-  private getCardioDuration(difficulty: string): number {
-    const normalizedDifficulty = difficulty.toLowerCase();
-    switch (normalizedDifficulty) {
-      case "beginner":
-        return 30;
-      case "intermediate":
-        return 45;
-      case "advanced":
-        return 60;
-      default:
-        return 45;
-    }
-  }
+    const difficultyMultiplier = {
+      Beginner: 0.8,
+      Intermediate: 1.0,
+      Advanced: 1.2,
+    };
 
-  private getRestTime(difficulty: string): number {
-    const normalizedDifficulty = difficulty.toLowerCase();
-    switch (normalizedDifficulty) {
-      case "beginner":
-        return 60;
-      case "intermediate":
-        return 45;
-      case "advanced":
-        return 30;
-      default:
-        return 45;
-    }
+    const params =
+      baseParams[goal as keyof typeof baseParams] || baseParams.weight_loss;
+    const multiplier =
+      difficultyMultiplier[difficulty as keyof typeof difficultyMultiplier] ||
+      1.0;
+
+    return {
+      sets: Math.round(params.sets * multiplier),
+      reps: Math.round(params.reps * multiplier),
+      restTime: params.restTime,
+    };
   }
 
   private generateWorkoutName(preferences: WorkoutPreferences): string {
-    const bodyPartNames = preferences.bodyParts.join(" & ");
-    const duration = preferences.duration;
+    const goalNames = {
+      weight_loss: "Fat Burn",
+      muscle_gain: "Muscle Builder",
+      endurance: "Endurance",
+      strength: "Strength",
+    };
 
-    return `${duration}-Min ${bodyPartNames} Workout`;
+    const bodyPartName =
+      preferences.bodyParts.length === 1
+        ? preferences.bodyParts[0].charAt(0).toUpperCase() +
+          preferences.bodyParts[0].slice(1)
+        : "Full Body";
+
+    return `${preferences.difficulty} ${
+      goalNames[preferences.fitnessGoal]
+    } - ${bodyPartName}`;
   }
 
   private generateWorkoutDescription(preferences: WorkoutPreferences): string {
+    const duration = preferences.duration;
+    const bodyParts = preferences.bodyParts.join(" and ");
     const goal = preferences.fitnessGoal.replace("_", " ");
-    return `A ${preferences.difficulty.toLowerCase()} ${
-      preferences.duration
-    }-minute workout focused on ${goal} and targeting ${preferences.bodyParts.join(
-      ", "
-    )}.`;
+
+    return `A ${duration}-minute ${preferences.difficulty.toLowerCase()} workout targeting ${bodyParts} for ${goal}.`;
+  }
+
+  private getFallbackWorkout(
+    preferences: WorkoutPreferences
+  ): GeneratedWorkout {
+    return {
+      id: "fallback_workout",
+      name: "Basic Workout",
+      description: "A simple bodyweight workout",
+      duration: preferences.duration,
+      difficulty: preferences.difficulty,
+      category: "Full Body",
+      exercises: [
+        {
+          exercise: {
+            id: "push_ups_fallback",
+            name: "Push-ups",
+            bodyPart: "chest",
+            target: "pectorals",
+            equipment: "body weight",
+            gifUrl: "/placeholder.svg?height=300&width=300&text=Push-ups",
+            difficulty: "Beginner",
+            category: "chest",
+          },
+          sets: 3,
+          reps: 10,
+          restTime: 60,
+        },
+      ],
+    };
   }
 }
 
-export const workoutGenerator = new WorkoutGeneratorService();
+export const workoutGenerator = new WorkoutGenerator();

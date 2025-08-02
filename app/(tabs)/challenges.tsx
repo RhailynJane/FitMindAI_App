@@ -2,16 +2,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
+import type { ColorValue } from "react-native";
 import {
   Alert,
-  ColorValue,
-  SafeAreaView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../hooks/useAuth";
 import {
   firestoreService,
@@ -21,6 +22,7 @@ import {
 
 export default function ChallengesScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>(
     []
   );
@@ -115,24 +117,30 @@ export default function ChallengesScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Challenges</Text>
         </View>
         <View style={styles.loadingContainer}>
           <Text>Loading challenges...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Challenges</Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: Platform.OS === "ios" ? 100 : 80,
+        }}
+      >
         {/* Active Challenges */}
         {userChallenges.filter(
           (uc) => !uc.completed && new Date() <= uc.endDate
@@ -317,7 +325,7 @@ export default function ChallengesScreen() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
