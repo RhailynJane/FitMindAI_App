@@ -19,19 +19,14 @@ export default function Welcome() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {" "}
-      {/* Outer container with safe area padding */}
       <View style={styles.content}>
-        {" "}
-        {/* Main layout container with padding and spacing */}
         {/* Main content section with logo and tagline */}
         <View style={styles.mainContent}>
           {/* Branding section */}
           <View style={styles.brandContainer}>
             <Text style={styles.brandName}>
               FitMind
-              <Text style={styles.brandAccent}>AI</Text>{" "}
-              {/* Accent color for 'AI' */}
+              <Text style={styles.brandAccent}>AI</Text>
             </Text>
           </View>
 
@@ -42,6 +37,7 @@ export default function Welcome() {
             <Text style={styles.tagline}>Be unshakable</Text>
           </View>
         </View>
+
         {/* Button to navigate to onboarding screen */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity

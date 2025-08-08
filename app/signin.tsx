@@ -175,9 +175,7 @@ export default function SignIn() {
 
               {/* Redirect to Sign Up Screen */}
               <View style={styles.signUpContainer}>
-                <Text style={styles.signUpText}>
-                  Dont have an account yet?{" "}
-                </Text>
+                <Text style={styles.signUpText}>Dont have an account yet?</Text>
                 <TouchableOpacity onPress={() => router.push("/signup")}>
                   <Text style={styles.signUpLink}>Register</Text>
                 </TouchableOpacity>

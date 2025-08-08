@@ -1,4 +1,3 @@
-
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -271,8 +270,7 @@ export default function Dashboard() {
                     {activeChallenge.challenge.title}
                   </Text>
                   <Text style={styles.challengeProgress}>
-                    Day {activeChallenge.current} of{" "}
-                    {activeChallenge.challenge.target} • Keep it up!
+                    {`Day ${activeChallenge.current} of ${activeChallenge.challenge.target} • Keep it up!`}
                   </Text>
                 </View>
                 <Text style={styles.challengePercentage}>
@@ -360,8 +358,9 @@ export default function Dashboard() {
                 </View>
                 <View style={styles.activityInfo}>
                   <Text style={styles.activityTitle}>
-                    {userStats?.totalWorkouts} workout
-                    {userStats?.totalWorkouts !== 1 ? "s" : ""} completed
+                    {`${userStats?.totalWorkouts} workout${
+                      userStats?.totalWorkouts !== 1 ? "s" : ""
+                    } completed`}
                   </Text>
                   <Text style={styles.activitySubtitle}>
                     {userStats?.lastWorkoutDate

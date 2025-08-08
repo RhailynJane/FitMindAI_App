@@ -18,76 +18,78 @@ import {
 /**
  * WorkoutSessionScreen Component
  *
- * A comprehensive workout session management screen that handles:
- * - Pre-workout overview and exercise list
- * - Countdown timer before each exercise/set
- * - Active workout timer with pause/resume functionality
- * - Set and exercise progression
- * - Overall workout progress tracking
+ * A comprehensive workout session management screen that provides:
+ * - Pre-workout overview displaying exercise list and workout details
+ * - Countdown timer (3-2-1) before each exercise and set
+ * - Active workout interface with exercise GIF, timer, and progress tracking
+ * - Pause/resume functionality for workout control
+ * - Automatic progression through sets and exercises
+ * - Overall workout progress visualization
  *
- * Route: Expects an 'id' parameter from the URL for workout identification
+ * @route Expects 'id' parameter for workout identification
  */
 export default function WorkoutSessionScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  // Core workout data
+  // Core workout data state
   const [workout, setWorkout] = useState<GeneratedWorkout | null>(null);
 
-  // Workout session state management
-  const [isStarted, setIsStarted] = useState(false); // Whether workout has begun
-  const [isPaused, setIsPaused] = useState(false); // Pause/resume state
-  const [currentExercise, setCurrentExercise] = useState(0); // Index of current exercise
-  const [currentSet, setCurrentSet] = useState(1); // Current set number
+  // Workout session control states
+  const [isStarted, setIsStarted] = useState(false); // Has workout session begun
+  const [isPaused, setIsPaused] = useState(false); // Is workout currently paused
+  const [currentExercise, setCurrentExercise] = useState(0); // Index of current exercise (0-based)
+  const [currentSet, setCurrentSet] = useState(1); // Current set number (1-based)
 
-  // Timer states
-  const [countdown, setCountdown] = useState(3); // Pre-exercise countdown (3-2-1)
-  const [exerciseTime, setExerciseTime] = useState(30); // Time remaining for current exercise
+  // Timer-related states
+  const [countdown, setCountdown] = useState(3); // Pre-exercise countdown (3, 2, 1)
+  const [exerciseTime, setExerciseTime] = useState(30); // Time remaining for current exercise/set
 
-  // Load workout data when component mounts or ID changes
+  // Load workout data when component mounts or workout ID changes
   useEffect(() => {
     loadWorkout();
   }, [id]);
 
   /**
-   * Main timer effect - Handles all timing logic for the workout
-   * Manages countdown, exercise timing, and progression between sets/exercises
+   * Main timer management effect
+   * Handles all timing logic including countdown, exercise timing, and workout progression
+   * Uses proper TypeScript typing for setTimeout return value
    */
   useEffect(() => {
-    let timer: number;
+    let timer: ReturnType<typeof setTimeout>; // Properly typed timer variable
 
-    // Only run timer when workout is active and not paused
+    // Only run timers when workout is active and not paused
     if (isStarted && !isPaused && workout) {
       if (countdown > 0) {
-        // Pre-exercise countdown phase (3-2-1)
+        // Countdown phase: Decrement countdown timer
         timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       } else if (exerciseTime > 0) {
-        // Active exercise timing phase
+        // Exercise phase: Decrement exercise timer
         timer = setTimeout(() => setExerciseTime(exerciseTime - 1), 1000);
       } else {
-        // Exercise time completed - handle progression logic
+        // Exercise time completed: Handle progression logic
         const currentWorkoutExercise = workout.exercises[currentExercise];
 
         if (currentSet < currentWorkoutExercise.sets) {
-          // Move to next set of the same exercise
+          // Move to next set of current exercise
           setCurrentSet(currentSet + 1);
           setExerciseTime(currentWorkoutExercise.duration || 30);
           setCountdown(3); // Reset countdown for next set
         } else if (currentExercise < workout.exercises.length - 1) {
-          // Move to next exercise (reset to set 1)
+          // Move to next exercise (first set)
           setCurrentExercise(currentExercise + 1);
           setCurrentSet(1);
           const nextExercise = workout.exercises[currentExercise + 1];
           setExerciseTime(nextExercise.duration || 30);
           setCountdown(3); // Reset countdown for next exercise
         } else {
-          // All exercises completed - navigate to completion screen
+          // All exercises completed: Navigate to completion screen
           router.push("/workout-complete");
         }
       }
     }
 
-    // Cleanup timer on unmount or dependency change
+    // Cleanup function to prevent memory leaks
     return () => clearTimeout(timer);
   }, [
     isStarted,
@@ -102,12 +104,12 @@ export default function WorkoutSessionScreen() {
 
   /**
    * Loads workout data from the workout generator service
-   * Currently generates a sample workout - could be modified to load by ID
+   * Currently generates a sample workout - in production would fetch by provided ID
    */
   const loadWorkout = async () => {
     try {
-      // Generate a sample workout for demonstration
-      // In production, this would likely fetch by the provided ID
+      // Generate sample workout with predefined parameters
+      // TODO: Replace with actual workout loading by ID
       const sampleWorkout = await workoutGenerator.generateWorkout({
         duration: 20,
         difficulty: "Beginner",
@@ -118,38 +120,51 @@ export default function WorkoutSessionScreen() {
       setWorkout(sampleWorkout);
     } catch (error) {
       console.error("Error loading workout:", error);
+      // TODO: Add user-facing error handling
     }
   };
 
   /**
    * Toggles workout pause/resume state
-   * Allows users to pause and resume their workout session
+   * Allows users to pause during exercise without losing progress
    */
   const togglePause = () => {
     setIsPaused(!isPaused);
   };
 
   /**
-   * Skips the current exercise and moves to the next one
-   * Resets set count and timers for the next exercise
+   * Skips current exercise and advances to next
+   * Resets set counter and timers for next exercise
+   * Navigates to completion if on last exercise
    */
   const skipExercise = () => {
     if (!workout) return;
 
     if (currentExercise < workout.exercises.length - 1) {
-      // Move to next exercise
+      // Advance to next exercise
       setCurrentExercise(currentExercise + 1);
-      setCurrentSet(1);
+      setCurrentSet(1); // Reset to first set
       const nextExercise = workout.exercises[currentExercise + 1];
       setExerciseTime(nextExercise.duration || 30);
-      setCountdown(3);
+      setCountdown(3); // Start with countdown
     } else {
-      // Last exercise - complete workout
+      // Last exercise: Complete workout
       router.push("/workout-complete");
     }
   };
 
-  // Loading state - shown while workout data is being fetched
+  // Helper function to format exercise duration/reps safely
+  const formatExerciseTarget = (workoutEx: any) => {
+    if (workoutEx.reps) {
+      return `${workoutEx.reps} reps`;
+    } else if (workoutEx.duration) {
+      return `${workoutEx.duration}s`;
+    } else {
+      return "30s"; // Default fallback
+    }
+  };
+
+  // Loading state: Display while fetching workout data
   if (!workout) {
     return (
       <SafeAreaView style={styles.container}>
@@ -160,23 +175,23 @@ export default function WorkoutSessionScreen() {
     );
   }
 
-  // Get current exercise data for easy access
+  // Extract current exercise data for easier access
   const currentWorkoutExercise = workout.exercises[currentExercise];
   const currentExerciseData = currentWorkoutExercise.exercise;
 
   /**
-   * Pre-workout screen - Shows workout overview and exercise list
-   * Displayed before user starts the actual workout session
+   * Pre-workout screen: Shows workout overview before starting
+   * Displays workout details and complete exercise list
    */
   if (!isStarted) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.preWorkoutContainer}>
-          {/* Workout title and description */}
+          {/* Workout header information */}
           <Text style={styles.workoutTitle}>{workout.name}</Text>
           <Text style={styles.workoutDescription}>{workout.description}</Text>
 
-          {/* List of exercises in the workout */}
+          {/* Exercise preview list */}
           <View style={styles.exerciseList}>
             {workout.exercises.map((workoutEx, index) => (
               <View key={index} style={styles.exerciseItem}>
@@ -184,15 +199,14 @@ export default function WorkoutSessionScreen() {
                 <View style={styles.exerciseNumber}>
                   <Text style={styles.exerciseNumberText}>{index + 1}</Text>
                 </View>
-                {/* Exercise details */}
+                {/* Exercise information */}
                 <View style={styles.exerciseDetails}>
                   <Text style={styles.exerciseName}>
                     {workoutEx.exercise.name}
                   </Text>
-                  {/* Sets and reps/duration information */}
+                  {/* Display sets × reps or sets × duration - FIXED */}
                   <Text style={styles.exerciseDuration}>
-                    {workoutEx.sets} sets ×{" "}
-                    {workoutEx.reps || workoutEx.duration + "s"}
+                    {workoutEx.sets} sets × {formatExerciseTarget(workoutEx)}
                   </Text>
                 </View>
               </View>
@@ -212,17 +226,17 @@ export default function WorkoutSessionScreen() {
   }
 
   /**
-   * Countdown screen - Shows 3-2-1 countdown before each exercise/set
-   * Gives users time to prepare for the next exercise
+   * Countdown screen: Shows 3-2-1 countdown before each exercise/set
+   * Provides preparation time and shows upcoming exercise info
    */
   if (countdown > 0) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.countdownContainer}>
           <Text style={styles.readyText}>READY TO GO!</Text>
-          {/* Large countdown number */}
+          {/* Large countdown display */}
           <Text style={styles.countdownText}>{countdown}</Text>
-          {/* Next exercise name */}
+          {/* Upcoming exercise name */}
           <Text style={styles.nextExerciseText}>
             Get ready for {currentExerciseData.name}
           </Text>
@@ -236,21 +250,22 @@ export default function WorkoutSessionScreen() {
   }
 
   /**
-   * Active workout screen - Main exercise interface
-   * Shows exercise GIF, timer, progress, and controls
+   * Active workout screen: Main exercise interface
+   * Shows exercise GIF, timer, progress bars, and control buttons
    */
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with back button and exercise name */}
+      {/* Header with navigation and exercise name */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{currentExerciseData.name}</Text>
+        {/* Spacer for centered title */}
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Main workout content */}
+      {/* Main workout content area */}
       <View style={styles.workoutContainer}>
         {/* Exercise demonstration GIF */}
         <Image
@@ -258,20 +273,20 @@ export default function WorkoutSessionScreen() {
           style={styles.exerciseImage}
         />
 
-        {/* Current set information */}
+        {/* Current set indicator */}
         <View style={styles.setInfo}>
           <Text style={styles.setInfoText}>
             Set {currentSet} of {currentWorkoutExercise.sets}
           </Text>
         </View>
 
-        {/* Exercise time progress bar */}
+        {/* Exercise timer progress bar */}
         <View style={styles.progressBarContainer}>
           <View
             style={[
               styles.progressBar,
               {
-                // Calculate progress percentage based on remaining time
+                // Dynamic width based on remaining exercise time
                 width: `${
                   (exerciseTime / (currentWorkoutExercise.duration || 30)) * 100
                 }%`,
@@ -280,10 +295,10 @@ export default function WorkoutSessionScreen() {
           />
         </View>
 
-        {/* Large timer display */}
+        {/* Large timer display showing seconds remaining */}
         <Text style={styles.timerText}>{exerciseTime}</Text>
 
-        {/* Reps or time information */}
+        {/* Exercise target information (reps or time) - FIXED */}
         <View style={styles.repsInfo}>
           <Text style={styles.repsText}>
             {currentWorkoutExercise.reps
@@ -292,9 +307,9 @@ export default function WorkoutSessionScreen() {
           </Text>
         </View>
 
-        {/* Control buttons - pause/resume and skip */}
+        {/* Control buttons for pause/resume and skip */}
         <View style={styles.controlsContainer}>
-          {/* Pause/Resume button */}
+          {/* Pause/Resume button with dynamic icon */}
           <TouchableOpacity style={styles.controlButton} onPress={togglePause}>
             <Ionicons
               name={isPaused ? "play" : "pause"}
@@ -312,20 +327,20 @@ export default function WorkoutSessionScreen() {
 
       {/* Footer with overall workout progress */}
       <View style={styles.footer}>
-        {/* Progress text */}
+        {/* Progress information text */}
         <View style={styles.progressInfo}>
           <Text style={styles.progressLabel}>Progress</Text>
           <Text style={styles.progressText}>
             {currentExercise + 1}/{workout.exercises.length}
           </Text>
         </View>
-        {/* Overall progress bar */}
+        {/* Overall workout progress bar */}
         <View style={styles.overallProgressContainer}>
           <View
             style={[
               styles.overallProgressBar,
               {
-                // Calculate overall workout progress
+                // Calculate percentage of workout completed
                 width: `${
                   ((currentExercise + 1) / workout.exercises.length) * 100
                 }%`,
@@ -338,15 +353,15 @@ export default function WorkoutSessionScreen() {
   );
 }
 
-// Comprehensive styling for all workout session states and components
+// Comprehensive styling for all workout session screens and components
 const styles = StyleSheet.create({
-  // Main container with light purple background
+  // Main container with light purple theme
   container: {
     flex: 1,
-    backgroundColor: "#efdff1",
+    backgroundColor: "#efdff1", // Light purple background
   },
 
-  // Loading state styles
+  // Loading screen styles
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -354,10 +369,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: "#666",
+    color: "#666", // Medium gray text
   },
 
-  // Pre-workout overview styles
+  // Pre-workout overview screen styles
   preWorkoutContainer: {
     flex: 1,
     alignItems: "center",
@@ -367,19 +382,19 @@ const styles = StyleSheet.create({
   workoutTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#9512af",
+    color: "#9512af", // Brand purple color
     marginBottom: 8,
     textAlign: "center",
   },
   workoutDescription: {
     fontSize: 14,
     color: "#666",
-    marginBottom: 48,
+    marginBottom: 48, // Large spacing before exercise list
     textAlign: "center",
     paddingHorizontal: 20,
   },
 
-  // Exercise list styles for pre-workout overview
+  // Exercise list styles (pre-workout)
   exerciseList: {
     width: "100%",
     marginBottom: 48,
@@ -392,8 +407,8 @@ const styles = StyleSheet.create({
   exerciseNumber: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: "#f3e8f5",
+    borderRadius: 20, // Circular badge
+    backgroundColor: "#f3e8f5", // Light purple background
     alignItems: "center",
     justifyContent: "center",
     marginRight: 16,
@@ -404,7 +419,7 @@ const styles = StyleSheet.create({
     color: "#9512af",
   },
   exerciseDetails: {
-    flex: 1,
+    flex: 1, // Take remaining space
   },
   exerciseName: {
     fontSize: 16,
@@ -413,7 +428,7 @@ const styles = StyleSheet.create({
   },
   exerciseDuration: {
     fontSize: 14,
-    color: "#666",
+    color: "#666", // Secondary text color
   },
 
   // Start workout button
@@ -421,7 +436,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#9512af",
     paddingVertical: 20,
     paddingHorizontal: 40,
-    borderRadius: 25,
+    borderRadius: 25, // Rounded button
     width: "100%",
     alignItems: "center",
   },
@@ -444,7 +459,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   countdownText: {
-    fontSize: 72,
+    fontSize: 72, // Very large countdown number
     fontWeight: "bold",
     color: "#9512af",
     marginBottom: 32,
@@ -455,7 +470,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Set information styles (used in multiple screens)
+  // Set information (used across multiple screens)
   setInfo: {
     alignItems: "center",
     marginBottom: 16,
@@ -466,11 +481,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Active workout screen styles
+  // Active workout screen header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "space-between", // Distribute space evenly
     paddingHorizontal: 24,
     paddingVertical: 16,
   },
@@ -479,6 +494,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
   },
+
+  // Main workout content container
   workoutContainer: {
     flex: 1,
     alignItems: "center",
@@ -486,7 +503,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  // Exercise demonstration image
+  // Exercise demonstration image/GIF
   exerciseImage: {
     width: 300,
     height: 300,
@@ -494,9 +511,9 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
 
-  // Progress bar for individual exercise timing
+  // Exercise timer progress bar
   progressBarContainer: {
-    width: "80%",
+    width: "80%", // Responsive width
     height: 16,
     backgroundColor: "white",
     borderRadius: 8,
@@ -504,13 +521,13 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Brand color fill
     borderRadius: 8,
   },
 
-  // Large timer display
+  // Large timer text display
   timerText: {
-    fontSize: 48,
+    fontSize: 48, // Very large for visibility
     fontWeight: "bold",
     color: "#9512af",
     marginBottom: 16,
@@ -526,7 +543,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Control buttons container and styles
+  // Control buttons container and individual button styles
   controlsContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -534,7 +551,7 @@ const styles = StyleSheet.create({
   controlButton: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 28, // Circular button
     backgroundColor: "#9512af",
     alignItems: "center",
     justifyContent: "center",
@@ -544,9 +561,9 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "transparent",
+    backgroundColor: "transparent", // Transparent background
     borderWidth: 2,
-    borderColor: "#9512af",
+    borderColor: "#9512af", // Outline style
     alignItems: "center",
     justifyContent: "center",
   },

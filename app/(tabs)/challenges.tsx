@@ -131,6 +131,29 @@ export default function ChallengesScreen() {
     );
   };
 
+  // Helper function to safely format dates
+  const formatDate = (date: Date | string) => {
+    try {
+      const d = typeof date === "string" ? new Date(date) : date;
+      return d.toLocaleDateString();
+    } catch (error) {
+      return "Invalid Date";
+    }
+  };
+
+  // Helper function to safely calculate days left
+  const calculateDaysLeft = (endDate: Date | string) => {
+    try {
+      const end = typeof endDate === "string" ? new Date(endDate) : endDate;
+      const now = new Date();
+      const diffTime = end.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    } catch (error) {
+      return 0;
+    }
+  };
+
   // Show loading indicator while fetching data
   if (loading) {
     return (
@@ -162,12 +185,14 @@ export default function ChallengesScreen() {
       >
         {/* Active Challenges Section */}
         {userChallenges.filter(
-          (uc) => !uc.completed && new Date() <= uc.endDate
+          (uc) => !uc.completed && new Date() <= new Date(uc.endDate)
         ).length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Active Challenges</Text>
             {userChallenges
-              .filter((uc) => !uc.completed && new Date() <= uc.endDate)
+              .filter(
+                (uc) => !uc.completed && new Date() <= new Date(uc.endDate)
+              )
               .map((userChallenge) => (
                 <View key={userChallenge.id} style={styles.challengeCard}>
                   <LinearGradient
@@ -185,21 +210,26 @@ export default function ChallengesScreen() {
                         </Text>
                       </View>
                       <Text style={styles.challengePercentage}>
-                        {Math.round(userChallenge.progress)}%
+                        {Math.round(userChallenge.progress || 0)}%
                       </Text>
                     </View>
 
                     {/* Progress bar */}
                     <View style={styles.challengeProgress}>
                       <Text style={styles.progressText}>
-                        Day {userChallenge.current} of{" "}
-                        {userChallenge.challenge.target}
+                        Day {userChallenge.current || 0} of
+                        {userChallenge.challenge.target || 0}
                       </Text>
                       <View style={styles.progressBarContainer}>
                         <View
                           style={[
                             styles.progressBar,
-                            { width: `${userChallenge.progress}%` },
+                            {
+                              width: `${Math.min(
+                                100,
+                                userChallenge.progress || 0
+                              )}%`,
+                            },
                           ]}
                         />
                       </View>
@@ -208,15 +238,10 @@ export default function ChallengesScreen() {
                     {/* Footer with reward and time left */}
                     <View style={styles.challengeFooter}>
                       <Text style={styles.challengeReward}>
-                        Reward: {userChallenge.challenge.reward}
+                        Reward: {userChallenge.challenge.reward || "None"}
                       </Text>
                       <Text style={styles.challengeTimeLeft}>
-                        {Math.ceil(
-                          (userChallenge.endDate.getTime() -
-                            new Date().getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        )}{" "}
-                        days left
+                        {calculateDaysLeft(userChallenge.endDate)} days left
                       </Text>
                     </View>
                   </LinearGradient>
@@ -254,27 +279,29 @@ export default function ChallengesScreen() {
                   <View style={styles.challengeHeader}>
                     <View style={styles.challengeInfo}>
                       <Text style={styles.challengeTitle}>
-                        {challenge.title}
+                        {challenge.title || "Untitled Challenge"}
                       </Text>
                       <Text style={styles.challengeDescription}>
-                        {challenge.description}
+                        {challenge.description || "No description available"}
                       </Text>
                     </View>
                     <View style={styles.challengeTypeContainer}>
-                      <Text style={styles.challengeType}>{challenge.type}</Text>
+                      <Text style={styles.challengeType}>
+                        {challenge.type || "general"}
+                      </Text>
                     </View>
                   </View>
 
                   {/* Challenge basic details */}
                   <View style={styles.challengeDetails}>
                     <Text style={styles.challengeDetailText}>
-                      Duration: {challenge.duration} days
+                      Duration: {challenge.duration || 0} days
                     </Text>
                     <Text style={styles.challengeDetailText}>
-                      Target: {challenge.target} workouts
+                      Target: {challenge.target || 0} workouts
                     </Text>
                     <Text style={styles.challengeDetailText}>
-                      Reward: {challenge.reward}
+                      Reward: {challenge.reward || "None"}
                     </Text>
                   </View>
 
@@ -282,13 +309,19 @@ export default function ChallengesScreen() {
                   {userProgress ? (
                     <View style={styles.challengeProgress}>
                       <Text style={styles.progressText}>
-                        Progress: {userProgress.current} / {challenge.target}
+                        Progress: {userProgress.current || 0} /
+                        {challenge.target || 0}
                       </Text>
                       <View style={styles.progressBarContainer}>
                         <View
                           style={[
                             styles.progressBar,
-                            { width: `${userProgress.progress}%` },
+                            {
+                              width: `${Math.min(
+                                100,
+                                userProgress.progress || 0
+                              )}%`,
+                            },
                           ]}
                         />
                       </View>
@@ -334,17 +367,18 @@ export default function ChallengesScreen() {
                     <View style={styles.challengeHeader}>
                       <View style={styles.challengeInfo}>
                         <Text style={styles.challengeTitle}>
-                          {userChallenge.challenge.title} ✓
+                          {userChallenge.challenge.title ||
+                            "Untitled Challenge"}
+                          ✓
                         </Text>
                         <Text style={styles.challengeDescription}>
-                          Completed on{" "}
-                          {userChallenge.endDate.toLocaleDateString()}
+                          Completed on {formatDate(userChallenge.endDate)}
                         </Text>
                       </View>
                       <Ionicons name="trophy" size={24} color="white" />
                     </View>
                     <Text style={styles.challengeReward}>
-                      Reward Earned: {userChallenge.challenge.reward}
+                      Reward Earned: {userChallenge.challenge.reward || "None"}
                     </Text>
                   </LinearGradient>
                 </View>

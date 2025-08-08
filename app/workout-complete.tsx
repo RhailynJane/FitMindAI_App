@@ -85,10 +85,8 @@ export default function WorkoutCompleteScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {" "}
       {/* Outer container */}
       <View style={styles.content}>
-        {" "}
         {/* Main inner content */}
         {/* Header with close (X) button */}
         <View style={styles.header}>

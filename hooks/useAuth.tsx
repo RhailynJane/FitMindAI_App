@@ -1,64 +1,124 @@
-// Import necessary Firebase methods and types
-import { onAuthStateChanged, type User } from "firebase/auth";
-
-// Import React hooks and types
+// hooks/useAuth.ts
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import {
-  createContext, // To create the Auth context
-  useContext, // To consume the context
-  useEffect, // To run side effects (e.g., listening to auth changes)
-  useState, // To manage local state (user & loading)
-  type ReactNode, // For typing children props
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
 } from "react";
+import { auth, db } from "../lib/firebase";
 
-// Import the Firebase auth instance from your configuration
-import { auth } from "../lib/firebase";
-
-// Define the shape of the Auth context data
-interface AuthContextType {
-  user: User | null; // The authenticated user or null if not logged in
-  loading: boolean; // Whether the auth state is still loading
+// Firestore user profile type
+export interface UserProfile {
+  uid: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  phone?: string;
+  birthday?: string;
+  gender?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  fitnessGoals?: string[];
+  notifications?: {
+    master: boolean;
+    settings: {
+      id: string;
+      title: string;
+      description: string;
+      icon: string;
+      enabled: boolean;
+    }[];
+  };
+  locationTracking?: boolean;
+  profileVisibility?: boolean;
 }
 
-// Create the Auth context with default values
+// Auth context type
+interface AuthContextType {
+  user: FirebaseUser | null;
+  userProfile: UserProfile | null;
+  loading: boolean;
+}
+
+// Create context
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  userProfile: null,
   loading: true,
 });
 
-// Custom hook to easily access the auth context
+// Hook to consume auth context
 export const useAuth = () => {
-  const context = useContext(AuthContext); // Get context value
+  const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider"); // Safety check
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
-// Define props for the AuthProvider component
+// Provider props
 interface AuthProviderProps {
-  children: ReactNode; // Anything wrapped inside <AuthProvider>
+  children: ReactNode;
 }
 
-// AuthProvider component that manages and provides auth state
+// Provider component
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null); // State to store current user
-  const [loading, setLoading] = useState(true); // State to track loading status
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Set up a Firebase auth listener on mount
+  // Fetch profile from Firestore
+  const fetchUserProfile = async (uid: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, "users", uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setUserProfile({
+          ...data,
+          createdAt: data.createdAt?.toDate
+            ? data.createdAt.toDate()
+            : new Date(data.createdAt),
+          updatedAt: data.updatedAt?.toDate
+            ? data.updatedAt.toDate()
+            : new Date(data.updatedAt),
+        } as UserProfile);
+      } else {
+        setUserProfile(null);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      setUserProfile(null);
+    }
+  };
+
+  // Listen for auth changes
   useEffect(() => {
-    // Listen for auth state changes (login/logout)
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user); // Update user state
-      setLoading(false); // Stop loading once we know the auth state
+    console.log("Setting up auth listener");
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log(
+        "Auth state changed:",
+        firebaseUser ? "User logged in" : "No user"
+      );
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        await fetchUserProfile(firebaseUser.uid);
+      } else {
+        setUserProfile(null);
+      }
+      setLoading(false);
     });
 
-    // Cleanup listener when component unmounts
     return unsubscribe;
   }, []);
 
-  // Provide the current user and loading state to the entire app
+  console.log("AuthProvider rendering with", { user, userProfile, loading });
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, userProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );

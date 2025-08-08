@@ -61,13 +61,10 @@ function DefaultErrorFallback({
 }) {
   return (
     <View style={styles.container}>
-      <Ionicons name="alert-circle" size={48} color="#ff4444" />{" "}
-      {/* Error icon */}
-      <Text style={styles.title}>Something went wrong</Text> {/* Title */}
-      <Text style={styles.message}>{error.message}</Text> {/* Error message */}
+      <Ionicons name="alert-circle" size={48} color="#ff4444" />
+      <Text style={styles.title}>Something went wrong</Text>
+      <Text style={styles.message}>{error.message}</Text>
       <TouchableOpacity style={styles.retryButton} onPress={retry}>
-        {" "}
-        {/* Retry button */}
         <Text style={styles.retryText}>Try Again</Text>
       </TouchableOpacity>
     </View>

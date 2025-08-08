@@ -153,6 +153,17 @@ export default function WorkoutSessionScreen() {
     }
   };
 
+  // Helper function to format exercise duration/reps safely
+  const formatExerciseTarget = (workoutEx: any) => {
+    if (workoutEx.reps) {
+      return `${workoutEx.reps} reps`;
+    } else if (workoutEx.duration) {
+      return `${workoutEx.duration}s`;
+    } else {
+      return "30s"; // Default fallback
+    }
+  };
+
   // Loading state: Display while fetching workout data
   if (!workout) {
     return (
@@ -193,10 +204,9 @@ export default function WorkoutSessionScreen() {
                   <Text style={styles.exerciseName}>
                     {workoutEx.exercise.name}
                   </Text>
-                  {/* Display sets × reps or sets × duration */}
+                  {/* Display sets × reps or sets × duration - FIXED */}
                   <Text style={styles.exerciseDuration}>
-                    {workoutEx.sets} sets ×{" "}
-                    {workoutEx.reps || workoutEx.duration + "s"}
+                    {workoutEx.sets} sets × {formatExerciseTarget(workoutEx)}
                   </Text>
                 </View>
               </View>
@@ -288,13 +298,12 @@ export default function WorkoutSessionScreen() {
         {/* Large timer display showing seconds remaining */}
         <Text style={styles.timerText}>{exerciseTime}</Text>
 
-        {/* Exercise target information (reps or time) */}
+        {/* Exercise target information (reps or time) - FIXED */}
         <View style={styles.repsInfo}>
           <Text style={styles.repsText}>
             {currentWorkoutExercise.reps
-              ? `${currentWorkoutExercise.reps} reps` // Show target reps
-              : `${exerciseTime}s`}{" "}
-            {/* Show remaining time */}
+              ? `${currentWorkoutExercise.reps} reps`
+              : `${exerciseTime}s`}
           </Text>
         </View>
 

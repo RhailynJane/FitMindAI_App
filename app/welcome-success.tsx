@@ -19,21 +19,42 @@ import { useAuth } from "../hooks/useAuth";
 const { width } = Dimensions.get("window");
 
 export default function WelcomeSuccess() {
-  const { user } = useAuth(); // Get authenticated user info
+  const { user, loading } = useAuth(); // Get authenticated user info and loading state
   const router = useRouter(); // Initialize navigation handler
+
+  // Show loading state while auth is still loading
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.welcomeText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Function to extract and return first name of the user
   const getUserName = () => {
-    if (user?.displayName) {
-      return user.displayName.split(" ")[0]; // Get first word of displayName
+    // If no user, return default
+    if (!user) {
+      return "User";
     }
-    return "User"; // Fallback name if no displayName exists
+
+    const displayName = user?.displayName?.trim?.() || "";
+    if (displayName.length > 0) {
+      const firstName = displayName.split(" ")[0];
+      return firstName || "User";
+    }
+    return "User";
   };
 
   // Handler for "Go to Home" button — navigates to dashboard tab
   const handleGoToHome = () => {
-    router.replace("/(tabs)/dashboard"); // Replaces current screen with dashboard
+    router.replace("/(tabs)/dashboard");
   };
+
+  // Add error boundary for the user name
+  const displayName = getUserName();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -49,7 +70,7 @@ export default function WelcomeSuccess() {
 
         {/* Text section */}
         <View style={styles.textContainer}>
-          <Text style={styles.welcomeText}>Welcome, {getUserName()}!</Text>{" "}
+          <Text style={styles.welcomeText}>Welcome, {displayName}!</Text>
           {/* Personalized welcome */}
           <Text style={styles.subtitle}>
             You are all set now, lets reach your goals together with us

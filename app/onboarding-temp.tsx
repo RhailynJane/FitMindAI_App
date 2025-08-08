@@ -77,7 +77,6 @@ export default function Onboarding() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {" "}
       {/* Ensures content stays within safe bounds (notches, status bar) */}
       <View style={styles.content}>
         <ScrollView
