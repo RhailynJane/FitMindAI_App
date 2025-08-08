@@ -1,78 +1,81 @@
-// Import icon library for UI icons
 import { Ionicons } from "@expo/vector-icons";
-
-// Expo Router for navigation
 import { useRouter } from "expo-router";
-
-// Formik handles form state and validation
 import { Formik } from "formik";
-
-// useState for local state management
 import { useState } from "react";
-
-// React Native components
 import {
-  ActivityIndicator, // shows loading spinner
-  Alert, // shows alert dialogs
-  SafeAreaView, // avoids unsafe screen areas
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-
-// Yup is used to define form validation schema
 import * as Yup from "yup";
-
-// Custom hook to handle auth actions (sign in, sign out, etc.)
 import { useAuthFunctions } from "../hooks/useAuthFunctions";
 
-// Validation schema using Yup
+// Validation schema
 const SignInSchema = Yup.object().shape({
   email: Yup.string()
-    .email("Invalid email address") // Validates proper email format
-    .required("Email is required"), // Field is required
+    .email("Invalid email address")
+    .required("Email is required"),
   password: Yup.string()
-    .min(6, "Password must be at least 6 characters") // Minimum length check
+    .min(6, "Password must be at least 6 characters")
     .required("Password is required"),
 });
 
-// TypeScript interface to define shape of form values
 interface SignInFormValues {
   email: string;
   password: string;
 }
 
 export default function SignIn() {
-  const [showPassword, setShowPassword] = useState(false); // Toggle visibility of password field
-  const { signIn } = useAuthFunctions(); // Get signIn function from auth hook
-  const router = useRouter(); // Router to navigate to other screens
+  const [showPassword, setShowPassword] = useState(false);
+  const { signIn, resetPassword } = useAuthFunctions();
+  const router = useRouter();
 
-  // Function to handle sign-in logic
+  // Handle sign in
   const handleSignIn = async (values: SignInFormValues) => {
     try {
-      await signIn(values.email, values.password); // Attempt to sign in with provided credentials
-      router.push("/welcome-success"); // Redirect on successful login
+      await signIn(values.email, values.password);
+      router.push("/welcome-success");
     } catch (error: any) {
-      Alert.alert("Sign In Failed", error.message); // Show error if login fails
+      Alert.alert("Sign In Failed", error.message);
+    }
+  };
+
+  // Handle forgot password
+  const handleForgotPassword = async (email: string) => {
+    if (!email) {
+      Alert.alert(
+        "Enter Email",
+        "Please enter your email address so we can send you a reset link."
+      );
+      return;
+    }
+    try {
+      await resetPassword(email);
+      Alert.alert("Success", "Password reset email sent. Check your inbox.");
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Header text */}
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey there,</Text>
           <Text style={styles.title}>Welcome Back</Text>
         </View>
 
-        {/* Formik manages form values and validation */}
+        {/* Form */}
         <Formik
           initialValues={{ email: "", password: "" }}
-          validationSchema={SignInSchema} // Apply Yup validation
-          onSubmit={handleSignIn} // Submit handler
+          validationSchema={SignInSchema}
+          onSubmit={handleSignIn}
         >
           {({
             handleChange,
@@ -84,7 +87,7 @@ export default function SignIn() {
             isSubmitting,
           }) => (
             <View style={styles.form}>
-              {/* Email Input Field */}
+              {/* Email */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="mail-outline"
@@ -103,12 +106,11 @@ export default function SignIn() {
                   autoCorrect={false}
                 />
               </View>
-              {/* Email validation error */}
               {touched.email && errors.email && (
                 <Text style={styles.errorText}>{errors.email}</Text>
               )}
 
-              {/* Password Input Field */}
+              {/* Password */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="lock-closed-outline"
@@ -125,7 +127,6 @@ export default function SignIn() {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
-                {/* Toggle password visibility */}
                 <TouchableOpacity
                   style={styles.eyeIcon}
                   onPress={() => setShowPassword(!showPassword)}
@@ -137,13 +138,15 @@ export default function SignIn() {
                   />
                 </TouchableOpacity>
               </View>
-              {/* Password validation error */}
               {touched.password && errors.password && (
                 <Text style={styles.errorText}>{errors.password}</Text>
               )}
 
-              {/* Forgot Password Link */}
-              <TouchableOpacity style={styles.forgotPassword}>
+              {/* Forgot Password */}
+              <TouchableOpacity
+                style={styles.forgotPassword}
+                onPress={() => handleForgotPassword(values.email)}
+              >
                 <Text style={styles.forgotPasswordText}>
                   Forgot your password?
                 </Text>
@@ -155,8 +158,8 @@ export default function SignIn() {
                   styles.loginButton,
                   isSubmitting && styles.disabledButton,
                 ]}
-                onPress={() => handleSubmit()} // Trigger form submit
-                disabled={isSubmitting} // Disable button when submitting
+                onPress={() => handleSubmit()}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <ActivityIndicator color="white" />
@@ -173,7 +176,7 @@ export default function SignIn() {
                 )}
               </TouchableOpacity>
 
-              {/* Redirect to Sign Up Screen */}
+              {/* Sign Up Link */}
               <View style={styles.signUpContainer}>
                 <Text style={styles.signUpText}>Dont have an account yet?</Text>
                 <TouchableOpacity onPress={() => router.push("/signup")}>
@@ -188,35 +191,19 @@ export default function SignIn() {
   );
 }
 
-// StyleSheet for styling all components
+// Styles (same as before)
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#efdff1", // Light lavender background
-  },
+  container: { flex: 1, backgroundColor: "#efdff1" },
   content: {
     flex: 1,
     paddingHorizontal: 30,
     paddingTop: 80,
-    justifyContent: "center", // Vertically center content
+    justifyContent: "center",
   },
-  header: {
-    marginBottom: 60,
-    alignItems: "center",
-  },
-  greeting: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 5,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  form: {
-    flex: 1,
-  },
+  header: { marginBottom: 60, alignItems: "center" },
+  greeting: { fontSize: 16, color: "#666", marginBottom: 5 },
+  title: { fontSize: 20, fontWeight: "bold", color: "#333" },
+  form: { flex: 1 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -226,19 +213,11 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     height: 60,
   },
-  inputIcon: {
-    marginRight: 15,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
-  },
-  eyeIcon: {
-    padding: 5,
-  },
+  inputIcon: { marginRight: 15 },
+  input: { flex: 1, fontSize: 16, color: "#333" },
+  eyeIcon: { padding: 5 },
   errorText: {
-    color: "#ff4444", // Red color for validation error
+    color: "#ff4444",
     fontSize: 12,
     marginBottom: 10,
     marginLeft: 15,
@@ -254,7 +233,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   loginButton: {
-    backgroundColor: "#9512af", // Primary purple color
+    backgroundColor: "#9512af",
     borderRadius: 25,
     height: 60,
     flexDirection: "row",
@@ -265,19 +244,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5, // Android shadow
+    elevation: 5,
   },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  buttonIcon: {
-    marginRight: 10,
-  },
-  loginButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  disabledButton: { opacity: 0.7 },
+  buttonIcon: { marginRight: 10 },
+  loginButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   signUpContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -285,13 +256,6 @@ const styles = StyleSheet.create({
     marginTop: "auto",
     marginBottom: 40,
   },
-  signUpText: {
-    color: "#666",
-    fontSize: 14,
-  },
-  signUpLink: {
-    color: "#c58bf2",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  signUpText: { color: "#666", fontSize: 14 },
+  signUpLink: { color: "#c58bf2", fontSize: 14, fontWeight: "600" },
 });

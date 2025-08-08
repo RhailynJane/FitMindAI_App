@@ -5,12 +5,14 @@ import {
   deleteUser,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  sendPasswordResetEmail, // ✅ Added import
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
   updateProfile,
   User,
 } from "firebase/auth";
+
 import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useState } from "react";
 import { auth, db } from "../lib/firebase";
@@ -93,12 +95,28 @@ export const useAuthFunctions = () => {
     }
   };
 
+  /** Reset password (sends email) */
+  const resetPassword = async (email: string) => {
+    if (!email) throw new Error("Email is required");
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      console.log("Password reset email sent");
+      return true;
+    } catch (error: any) {
+      console.error("Error sending password reset email:", error);
+      throw new Error(error.message || "Failed to send password reset email");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /** Logout */
   const logout = async () => {
     try {
       setLoading(true);
       await signOut(auth);
-      router.replace("/signin"); // navigate to sign-in screen
+      router.replace("/signin");
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
@@ -131,7 +149,7 @@ export const useAuthFunctions = () => {
     }
   };
 
-  /** Delete account (no password check, full name confirmation in UI) */
+  /** Delete account */
   const deleteAccount = async (uid: string, user: User) => {
     setLoading(true);
     try {
@@ -208,6 +226,7 @@ export const useAuthFunctions = () => {
   return {
     signUp,
     signIn,
+    resetPassword,
     logout,
     changePassword,
     getUserProfile,

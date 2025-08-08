@@ -176,9 +176,6 @@ export default function Dashboard() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.menuButton}>
-            <Ionicons name="menu" size={24} color="#333" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Dashboard</Text>
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <Ionicons name="log-out-outline" size={20} color="#9512af" />
