@@ -1,23 +1,31 @@
-"use client"; // Enables client-side rendering (mainly for Next.js, safe to ignore in pure Expo projects)
+"use client";
 
-import { Ionicons } from "@expo/vector-icons"; // Icon set used for UI icons
-import { useRouter } from "expo-router"; // Expo Router navigation hook
-import { useEffect, useRef, useState } from "react"; // React state and lifecycle hooks
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import {
-  KeyboardAvoidingView, // Avoids keyboard covering input on iOS/Android
+  KeyboardAvoidingView,
   Platform,
-  SafeAreaView, // Ensures layout respects status bar, notches, etc.
-  ScrollView, // Enables vertical/horizontal scrolling
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity, // For clickable buttons
+  TouchableOpacity,
   View,
 } from "react-native";
 
-import { useAuth } from "../hooks/useAuth"; // Custom auth context hook to get user data
+import {
+  arrayUnion,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+import { useAuth } from "../hooks/useAuth";
+import { db } from "../lib/firebase";
+import openai from "../lib/openai";
 
-// Message type definition
 interface Message {
   id: string;
   text: string;
@@ -26,139 +34,167 @@ interface Message {
 }
 
 export default function AIChatScreen() {
-  const router = useRouter(); // Navigation controller
-  const { user } = useAuth(); // Get the current authenticated user
+  const router = useRouter();
+  const { user } = useAuth();
 
-  // Initial state with one welcome message from AI
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      text: "Hi! I'm your AI fitness coach. I can help you create personalized workout plans, answer fitness questions, and provide motivation. What would you like to work on today?",
-      isUser: false,
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const [inputText, setInputText] = useState(""); // Text input by the user
-  const [isLoading, setIsLoading] = useState(false); // Whether AI is "typing"
-  const scrollViewRef = useRef<ScrollView>(null); // Scroll view reference to scroll to bottom on new messages
+  // 🔹 Firestore document reference for this user's main chat
+  const chatRef = user && doc(db, "users", user.uid, "chats", "main");
 
-  // Scroll to the latest message whenever the messages change
+  // 🔹 Load chat history in real time
+  useEffect(() => {
+    if (!user || !chatRef) return;
+
+    const unsubscribe = onSnapshot(chatRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setMessages(
+          (data.messages || []).map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp),
+          }))
+        );
+      } else {
+        // Initialize chat if it doesn't exist
+        setMessages([
+          {
+            id: "1",
+            text: "Hi! I'm your AI fitness coach. I can help you create personalized workout plans, answer fitness questions, and provide motivation. What would you like to work on today?",
+            isUser: false,
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user, chatRef]);
+
+  // 🔹 Scroll to bottom on new messages
   useEffect(() => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
 
-  // AI message generator - currently using keyword matching
-  const generateAIResponse = async (userMessage: string): Promise<string> => {
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulated thinking delay
-    const lowerMessage = userMessage.toLowerCase();
+  // 🔹 Save message to Firestore
+  const saveMessage = async (message: Message) => {
+    if (!user || !chatRef) return;
 
-    // AI responses based on keywords in user's message
-    if (lowerMessage.includes("workout") || lowerMessage.includes("exercise")) {
-      return "Great! I'd love to help you with a workout plan. ...";
-    }
-    if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) {
-      return "Nutrition is crucial for fitness success! ...";
-    }
-    if (lowerMessage.includes("motivation") || lowerMessage.includes("tired")) {
-      return "I understand it can be challenging to stay motivated! ...";
-    }
-    if (lowerMessage.includes("beginner") || lowerMessage.includes("start")) {
-      return "Perfect! Starting your fitness journey is exciting. ...";
-    }
-    if (
-      lowerMessage.includes("weight loss") ||
-      lowerMessage.includes("lose weight")
-    ) {
-      return "Weight loss is achieved through a combination of ...";
-    }
-    if (lowerMessage.includes("muscle") || lowerMessage.includes("strength")) {
-      return "Building muscle requires consistent strength training ...";
-    }
-
-    // Fallback default response
-    return "That's a great question! Could you tell me more about your fitness goals?";
+    await setDoc(
+      chatRef,
+      {
+        messages: arrayUnion({
+          ...message,
+          timestamp: message.timestamp.toISOString(),
+        }),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
   };
 
-  // Handle user sending a message
-  const sendMessage = async () => {
-    if (!inputText.trim()) return; // Don't send empty messages
+  // 🔹 Call OpenAI API
+  const generateAIResponse = async (userMessage: string): Promise<string> => {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a friendly and knowledgeable AI fitness coach. " +
+              "You give short, clear, and motivational responses. " +
+              "You provide guidance on workouts, nutrition, and recovery. " +
+              "When giving workout advice, adapt to the user’s fitness level and available equipment. " +
+              "Use an encouraging tone but avoid being overly verbose.",
+          },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      });
 
-    // Add user message to message list
+      return (
+        completion.choices[0]?.message?.content?.trim() ??
+        "I’m not sure how to answer that — could you try rephrasing?"
+      );
+    } catch (error) {
+      console.error("Error generating AI response:", error);
+      return "I’m having trouble connecting right now — let’s try again in a moment.";
+    }
+  };
+
+  // 🔹 Handle sending message
+  const sendMessage = async () => {
+    if (!inputText.trim() || !user) return;
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text: inputText.trim(),
       isUser: true,
       timestamp: new Date(),
     };
+
+    // Local + Firestore
     setMessages((prev) => [...prev, userMessage]);
+    await saveMessage(userMessage);
+
     setInputText("");
     setIsLoading(true);
 
     try {
-      const aiResponse = await generateAIResponse(userMessage.text); // Get AI reply
+      const aiResponse = await generateAIResponse(userMessage.text);
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: aiResponse,
         isUser: false,
         timestamp: new Date(),
       };
+
       setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
-      console.error("Error generating AI response:", error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          text: "I'm sorry, I'm having trouble responding right now. Please try again later.",
-          isUser: false,
-          timestamp: new Date(),
-        },
-      ]);
+      await saveMessage(aiMessage);
     } finally {
-      setIsLoading(false); // Stop typing indicator
+      setIsLoading(false);
     }
   };
 
-  // Quick reply buttons with predefined prompts
   const quickActions = [
     { text: "Create workout plan", icon: "fitness" },
     { text: "Motivation tips", icon: "heart" },
     { text: "Beginner guide", icon: "school" },
   ];
 
-  // When a quick action is pressed, set the prompt in input field
   const handleQuickAction = (actionText: string) => {
     setInputText(actionText);
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header bar with back button and title */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>AI Fitness Coach</Text>
           <Text style={styles.headerSubtitle}>Always here to help</Text>
         </View>
-
-        {/* Online indicator */}
         <View style={styles.aiIndicator}>
           <View style={styles.aiDot} />
         </View>
       </View>
 
-      {/* Chat area with messages */}
+      {/* Chat */}
       <KeyboardAvoidingView
         style={styles.chatContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Messages list */}
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
@@ -201,7 +237,6 @@ export default function AIChatScreen() {
             </View>
           ))}
 
-          {/* AI typing indicator */}
           {isLoading && (
             <View style={styles.messageContainer}>
               <View style={[styles.messageBubble, styles.aiBubble]}>
@@ -215,7 +250,7 @@ export default function AIChatScreen() {
           )}
         </ScrollView>
 
-        {/* Quick reply buttons */}
+        {/* Quick Actions */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -233,7 +268,7 @@ export default function AIChatScreen() {
           ))}
         </ScrollView>
 
-        {/* Input box + send button */}
+        {/* Input */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -264,10 +299,7 @@ export default function AIChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8f9fa", // Light gray background
-  },
+  container: { flex: 1, backgroundColor: "#f8f9fa" },
   header: {
     backgroundColor: "white",
     paddingHorizontal: 20,
@@ -275,86 +307,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0", // Subtle border under header
+    borderBottomColor: "#f0f0f0",
   },
-  headerInfo: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "#666",
-  },
+  headerInfo: { flex: 1, marginLeft: 16 },
+  headerTitle: { fontSize: 18, fontWeight: "600", color: "#333" },
+  headerSubtitle: { fontSize: 12, color: "#666" },
   aiIndicator: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#4CAF50", // Green dot indicating "online"
+    backgroundColor: "#4CAF50",
     justifyContent: "center",
     alignItems: "center",
   },
-  aiDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "white", // Inner white dot
-  },
-  chatContainer: {
-    flex: 1,
-  },
-  messagesContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  messageContainer: {
-    marginBottom: 16,
-    alignItems: "flex-start", // Default left-align for AI
-  },
-  userMessageContainer: {
-    alignItems: "flex-end", // Right-align for user
-  },
-  messageBubble: {
-    maxWidth: "80%",
-    padding: 12,
-    borderRadius: 16,
-  },
-  aiBubble: {
-    backgroundColor: "white",
-    borderBottomLeftRadius: 4,
-  },
-  userBubble: {
-    backgroundColor: "#9512af", // Purple bubble for user
-    borderBottomRightRadius: 4,
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 20,
-  },
-  aiText: {
-    color: "#333",
-  },
-  userText: {
-    color: "white",
-  },
-  timestamp: {
-    fontSize: 10,
-    marginTop: 4,
-  },
-  aiTimestamp: {
-    color: "#999",
-  },
-  userTimestamp: {
-    color: "rgba(255,255,255,0.7)",
-  },
-  typingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  aiDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "white" },
+  chatContainer: { flex: 1 },
+  messagesContainer: { flex: 1, padding: 16 },
+  messageContainer: { marginBottom: 16, alignItems: "flex-start" },
+  userMessageContainer: { alignItems: "flex-end" },
+  messageBubble: { maxWidth: "80%", padding: 12, borderRadius: 16 },
+  aiBubble: { backgroundColor: "white", borderBottomLeftRadius: 4 },
+  userBubble: { backgroundColor: "#9512af", borderBottomRightRadius: 4 },
+  messageText: { fontSize: 16, lineHeight: 20 },
+  aiText: { color: "#333" },
+  userText: { color: "white" },
+  timestamp: { fontSize: 10, marginTop: 4 },
+  aiTimestamp: { color: "#999" },
+  userTimestamp: { color: "rgba(255,255,255,0.7)" },
+  typingIndicator: { flexDirection: "row", alignItems: "center" },
   typingDot: {
     width: 6,
     height: 6,
@@ -362,10 +342,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#9512af",
     marginHorizontal: 2,
   },
-  quickActionsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
+  quickActionsContainer: { paddingHorizontal: 16, paddingVertical: 8 },
   quickActionButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,11 +354,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0",
   },
-  quickActionText: {
-    fontSize: 12,
-    color: "#9512af",
-    marginLeft: 4,
-  },
+  quickActionText: { fontSize: 12, color: "#9512af", marginLeft: 4 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -409,7 +382,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: 8,
   },
-  sendButtonDisabled: {
-    backgroundColor: "#f0f0f0", // Gray when disabled
-  },
+  sendButtonDisabled: { backgroundColor: "#f0f0f0" },
 });
