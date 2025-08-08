@@ -1,20 +1,23 @@
-"use client";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+"use client"; // Enables client-side rendering (mainly for Next.js, safe to ignore in pure Expo projects)
+
+import { Ionicons } from "@expo/vector-icons"; // Icon set used for UI icons
+import { useRouter } from "expo-router"; // Expo Router navigation hook
+import { useEffect, useRef, useState } from "react"; // React state and lifecycle hooks
 import {
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, // Avoids keyboard covering input on iOS/Android
   Platform,
-  SafeAreaView,
-  ScrollView,
+  SafeAreaView, // Ensures layout respects status bar, notches, etc.
+  ScrollView, // Enables vertical/horizontal scrolling
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
+  TouchableOpacity, // For clickable buttons
   View,
 } from "react-native";
-import { useAuth } from "../hooks/useAuth";
 
+import { useAuth } from "../hooks/useAuth"; // Custom auth context hook to get user data
+
+// Message type definition
 interface Message {
   id: string;
   text: string;
@@ -23,8 +26,10 @@ interface Message {
 }
 
 export default function AIChatScreen() {
-  const router = useRouter();
-  const { user } = useAuth();
+  const router = useRouter(); // Navigation controller
+  const { user } = useAuth(); // Get the current authenticated user
+
+  // Initial state with one welcome message from AI
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
@@ -33,71 +38,67 @@ export default function AIChatScreen() {
       timestamp: new Date(),
     },
   ]);
-  const [inputText, setInputText] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
 
+  const [inputText, setInputText] = useState(""); // Text input by the user
+  const [isLoading, setIsLoading] = useState(false); // Whether AI is "typing"
+  const scrollViewRef = useRef<ScrollView>(null); // Scroll view reference to scroll to bottom on new messages
+
+  // Scroll to the latest message whenever the messages change
   useEffect(() => {
-    // Scroll to bottom when new messages are added
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
 
+  // AI message generator - currently using keyword matching
   const generateAIResponse = async (userMessage: string): Promise<string> => {
-    // Simulate AI processing delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulated thinking delay
     const lowerMessage = userMessage.toLowerCase();
 
-    // Simple AI responses based on keywords
+    // AI responses based on keywords in user's message
     if (lowerMessage.includes("workout") || lowerMessage.includes("exercise")) {
-      return "Great! I'd love to help you with a workout plan. Based on your fitness level, I recommend starting with a mix of cardio and strength training. Would you like me to create a personalized plan for you?";
+      return "Great! I'd love to help you with a workout plan. ...";
     }
-
     if (lowerMessage.includes("diet") || lowerMessage.includes("nutrition")) {
-      return "Nutrition is crucial for fitness success! I recommend focusing on whole foods, adequate protein intake, and staying hydrated. What are your current dietary goals?";
+      return "Nutrition is crucial for fitness success! ...";
     }
-
     if (lowerMessage.includes("motivation") || lowerMessage.includes("tired")) {
-      return "I understand it can be challenging to stay motivated! Remember, every small step counts. Even a 10-minute workout is better than none. What's been your biggest challenge lately?";
+      return "I understand it can be challenging to stay motivated! ...";
     }
-
     if (lowerMessage.includes("beginner") || lowerMessage.includes("start")) {
-      return "Perfect! Starting your fitness journey is exciting. I recommend beginning with 3 workouts per week, focusing on basic movements like squats, push-ups, and walking. Would you like me to create a beginner-friendly plan?";
+      return "Perfect! Starting your fitness journey is exciting. ...";
     }
-
     if (
       lowerMessage.includes("weight loss") ||
       lowerMessage.includes("lose weight")
     ) {
-      return "Weight loss is achieved through a combination of regular exercise and proper nutrition. I recommend a mix of cardio and strength training, along with a balanced diet. What's your current activity level?";
+      return "Weight loss is achieved through a combination of ...";
     }
-
     if (lowerMessage.includes("muscle") || lowerMessage.includes("strength")) {
-      return "Building muscle requires consistent strength training and adequate protein intake. I suggest focusing on compound movements like squats, deadlifts, and bench press. How many days per week can you commit to training?";
+      return "Building muscle requires consistent strength training ...";
     }
 
-    // Default response
-    return "That's a great question! As your AI fitness coach, I'm here to help you achieve your goals. Could you tell me more about what specific aspect of fitness you'd like to focus on?";
+    // Fallback default response
+    return "That's a great question! Could you tell me more about your fitness goals?";
   };
 
+  // Handle user sending a message
   const sendMessage = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim()) return; // Don't send empty messages
 
+    // Add user message to message list
     const userMessage: Message = {
       id: Date.now().toString(),
       text: inputText.trim(),
       isUser: true,
       timestamp: new Date(),
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setInputText("");
     setIsLoading(true);
 
     try {
-      const aiResponse = await generateAIResponse(userMessage.text);
+      const aiResponse = await generateAIResponse(userMessage.text); // Get AI reply
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         text: aiResponse,
@@ -107,48 +108,57 @@ export default function AIChatScreen() {
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
       console.error("Error generating AI response:", error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "I'm sorry, I'm having trouble responding right now. Please try again later.",
-        isUser: false,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: "I'm sorry, I'm having trouble responding right now. Please try again later.",
+          isUser: false,
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Stop typing indicator
     }
   };
 
+  // Quick reply buttons with predefined prompts
   const quickActions = [
     { text: "Create workout plan", icon: "fitness" },
-    { text: "Nutrition advice", icon: "restaurant" },
     { text: "Motivation tips", icon: "heart" },
     { text: "Beginner guide", icon: "school" },
   ];
 
+  // When a quick action is pressed, set the prompt in input field
   const handleQuickAction = (actionText: string) => {
     setInputText(actionText);
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header bar with back button and title */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
+
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>AI Fitness Coach</Text>
           <Text style={styles.headerSubtitle}>Always here to help</Text>
         </View>
+
+        {/* Online indicator */}
         <View style={styles.aiIndicator}>
           <View style={styles.aiDot} />
         </View>
       </View>
 
+      {/* Chat area with messages */}
       <KeyboardAvoidingView
         style={styles.chatContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
+        {/* Messages list */}
         <ScrollView
           ref={scrollViewRef}
           style={styles.messagesContainer}
@@ -191,6 +201,7 @@ export default function AIChatScreen() {
             </View>
           ))}
 
+          {/* AI typing indicator */}
           {isLoading && (
             <View style={styles.messageContainer}>
               <View style={[styles.messageBubble, styles.aiBubble]}>
@@ -204,7 +215,7 @@ export default function AIChatScreen() {
           )}
         </ScrollView>
 
-        {/* Quick Actions */}
+        {/* Quick reply buttons */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -222,7 +233,7 @@ export default function AIChatScreen() {
           ))}
         </ScrollView>
 
-        {/* Input Area */}
+        {/* Input box + send button */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
@@ -255,7 +266,7 @@ export default function AIChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#f8f9fa", // Light gray background
   },
   header: {
     backgroundColor: "white",
@@ -264,7 +275,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#f0f0f0", // Subtle border under header
   },
   headerInfo: {
     flex: 1,
@@ -283,7 +294,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#4CAF50", // Green dot indicating "online"
     justifyContent: "center",
     alignItems: "center",
   },
@@ -291,7 +302,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "white",
+    backgroundColor: "white", // Inner white dot
   },
   chatContainer: {
     flex: 1,
@@ -302,10 +313,10 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     marginBottom: 16,
-    alignItems: "flex-start",
+    alignItems: "flex-start", // Default left-align for AI
   },
   userMessageContainer: {
-    alignItems: "flex-end",
+    alignItems: "flex-end", // Right-align for user
   },
   messageBubble: {
     maxWidth: "80%",
@@ -317,7 +328,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
   },
   userBubble: {
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Purple bubble for user
     borderBottomRightRadius: 4,
   },
   messageText: {
@@ -399,6 +410,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   sendButtonDisabled: {
-    backgroundColor: "#f0f0f0",
+    backgroundColor: "#f0f0f0", // Gray when disabled
   },
 });

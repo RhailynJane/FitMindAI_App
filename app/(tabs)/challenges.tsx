@@ -1,4 +1,4 @@
-"use client";
+// Import necessary components and hooks
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
@@ -13,6 +13,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Custom hooks and services
 import { useAuth } from "../../hooks/useAuth";
 import {
   firestoreService,
@@ -20,19 +22,27 @@ import {
   type UserChallenge,
 } from "../../services/firestoreService";
 
+// Main screen component
 export default function ChallengesScreen() {
+  // Get current authenticated user
   const { user } = useAuth();
+
+  // Safe area inset for layout adjustment
   const insets = useSafeAreaInsets();
+
+  // State to manage available and user-specific challenges
   const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>(
     []
   );
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Loading state for initial fetch
 
+  // Load challenges when component mounts
   useEffect(() => {
     loadChallenges();
   }, []);
 
+  // Subscribe to live updates of user challenges
   useEffect(() => {
     if (!user) return;
 
@@ -46,6 +56,7 @@ export default function ChallengesScreen() {
     return unsubscribe;
   }, [user]);
 
+  // Load all challenges and user's joined challenges
   const loadChallenges = async () => {
     try {
       setLoading(true);
@@ -65,11 +76,12 @@ export default function ChallengesScreen() {
     }
   };
 
+  // Handle joining a challenge
   const handleJoinChallenge = async (challengeId: string) => {
     if (!user) return;
 
     try {
-      // Check if user already joined this challenge
+      // Prevent user from joining an already joined (and not completed) challenge
       const alreadyJoined = userChallenges.some(
         (uc) => uc.challengeId === challengeId && !uc.completed
       );
@@ -82,6 +94,7 @@ export default function ChallengesScreen() {
         return;
       }
 
+      // Join the challenge and confirm success
       await firestoreService.joinChallenge(user.uid, challengeId);
       Alert.alert("Success", "You have successfully joined the challenge!");
     } catch (error) {
@@ -90,6 +103,7 @@ export default function ChallengesScreen() {
     }
   };
 
+  // Get gradient color based on challenge type
   const getChallengeColor = (type: string): [ColorValue, ColorValue] => {
     switch (type) {
       case "consistency":
@@ -103,18 +117,21 @@ export default function ChallengesScreen() {
     }
   };
 
+  // Check if the user has joined the challenge
   const isUserJoined = (challengeId: string) => {
     return userChallenges.some(
       (uc) => uc.challengeId === challengeId && !uc.completed
     );
   };
 
+  // Get progress info for a specific challenge
   const getUserChallengeProgress = (challengeId: string) => {
     return userChallenges.find(
       (uc) => uc.challengeId === challengeId && !uc.completed
     );
   };
 
+  // Show loading indicator while fetching data
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -130,10 +147,12 @@ export default function ChallengesScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Challenges</Text>
       </View>
 
+      {/* Scrollable content */}
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -141,7 +160,7 @@ export default function ChallengesScreen() {
           paddingBottom: Platform.OS === "ios" ? 100 : 80,
         }}
       >
-        {/* Active Challenges */}
+        {/* Active Challenges Section */}
         {userChallenges.filter(
           (uc) => !uc.completed && new Date() <= uc.endDate
         ).length > 0 && (
@@ -155,6 +174,7 @@ export default function ChallengesScreen() {
                     colors={getChallengeColor(userChallenge.challenge.type)}
                     style={styles.challengeGradient}
                   >
+                    {/* Header with title and progress */}
                     <View style={styles.challengeHeader}>
                       <View style={styles.challengeInfo}>
                         <Text style={styles.challengeTitle}>
@@ -169,6 +189,7 @@ export default function ChallengesScreen() {
                       </Text>
                     </View>
 
+                    {/* Progress bar */}
                     <View style={styles.challengeProgress}>
                       <Text style={styles.progressText}>
                         Day {userChallenge.current} of{" "}
@@ -184,6 +205,7 @@ export default function ChallengesScreen() {
                       </View>
                     </View>
 
+                    {/* Footer with reward and time left */}
                     <View style={styles.challengeFooter}>
                       <Text style={styles.challengeReward}>
                         Reward: {userChallenge.challenge.reward}
@@ -203,10 +225,11 @@ export default function ChallengesScreen() {
           </>
         )}
 
-        {/* Available Challenges */}
+        {/* Available Challenges Section */}
         <Text style={styles.sectionTitle}>Available Challenges</Text>
 
         {availableChallenges.length === 0 ? (
+          // No available challenges fallback UI
           <View style={styles.noChallengesContainer}>
             <Ionicons name="trophy-outline" size={48} color="#ccc" />
             <Text style={styles.noChallengesTitle}>
@@ -227,6 +250,7 @@ export default function ChallengesScreen() {
                   colors={getChallengeColor(challenge.type)}
                   style={styles.challengeGradient}
                 >
+                  {/* Challenge header */}
                   <View style={styles.challengeHeader}>
                     <View style={styles.challengeInfo}>
                       <Text style={styles.challengeTitle}>
@@ -241,6 +265,7 @@ export default function ChallengesScreen() {
                     </View>
                   </View>
 
+                  {/* Challenge basic details */}
                   <View style={styles.challengeDetails}>
                     <Text style={styles.challengeDetailText}>
                       Duration: {challenge.duration} days
@@ -253,6 +278,7 @@ export default function ChallengesScreen() {
                     </Text>
                   </View>
 
+                  {/* Progress bar if user already joined */}
                   {userProgress ? (
                     <View style={styles.challengeProgress}>
                       <Text style={styles.progressText}>
@@ -269,6 +295,7 @@ export default function ChallengesScreen() {
                     </View>
                   ) : null}
 
+                  {/* Join button */}
                   <TouchableOpacity
                     style={[
                       styles.challengeButton,
@@ -292,7 +319,7 @@ export default function ChallengesScreen() {
           })
         )}
 
-        {/* Completed Challenges */}
+        {/* Completed Challenges Section */}
         {userChallenges.filter((uc) => uc.completed).length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Completed Challenges</Text>

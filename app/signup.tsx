@@ -1,4 +1,5 @@
 "use client";
+
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Formik } from "formik";
@@ -17,6 +18,7 @@ import {
 import * as Yup from "yup";
 import { useAuthFunctions } from "../hooks/useAuthFunctions";
 
+// Validation schema using Yup
 const SignUpSchema = Yup.object().shape({
   firstName: Yup.string()
     .min(2, "First name must be at least 2 characters")
@@ -36,6 +38,7 @@ const SignUpSchema = Yup.object().shape({
   ),
 });
 
+// TypeScript interface for form values
 interface SignUpFormValues {
   firstName: string;
   lastName: string;
@@ -45,10 +48,11 @@ interface SignUpFormValues {
 }
 
 export default function SignUp() {
-  const [showPassword, setShowPassword] = useState(false);
-  const { signUp } = useAuthFunctions();
-  const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false); // Toggle for showing/hiding password
+  const { signUp } = useAuthFunctions(); // Custom hook for signup logic
+  const router = useRouter(); // Router for navigation
 
+  // Form submission handler
   const handleSignUp = async (
     values: SignUpFormValues,
     { setSubmitting }: any
@@ -63,12 +67,12 @@ export default function SignUp() {
       );
       console.log("Signup successful, navigating to profile setup");
 
-      // Navigate to profile setup after successful signup
+      // Navigate to next screen on success
       router.push("/profile-setup");
     } catch (error: any) {
       console.error("Signup error:", error);
 
-      // Show user-friendly error message
+      // Show error to user
       Alert.alert(
         "Sign Up Failed",
         error.message || "An unknown error occurred. Please try again.",
@@ -80,19 +84,20 @@ export default function SignUp() {
         ]
       );
     } finally {
-      // Make sure to set submitting to false to reset the loading state
-      setSubmitting(false);
+      setSubmitting(false); // Reset loading state
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey there,</Text>
           <Text style={styles.title}>Create an Account</Text>
         </View>
 
+        {/* Formik Form */}
         <Formik
           initialValues={{
             firstName: "",
@@ -115,6 +120,7 @@ export default function SignUp() {
             setFieldValue,
           }) => (
             <View style={styles.form}>
+              {/* First Name Field */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="person-outline"
@@ -135,6 +141,7 @@ export default function SignUp() {
                 <Text style={styles.errorText}>{errors.firstName}</Text>
               )}
 
+              {/* Last Name Field */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="person-outline"
@@ -155,6 +162,7 @@ export default function SignUp() {
                 <Text style={styles.errorText}>{errors.lastName}</Text>
               )}
 
+              {/* Email Field */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="mail-outline"
@@ -177,6 +185,7 @@ export default function SignUp() {
                 <Text style={styles.errorText}>{errors.email}</Text>
               )}
 
+              {/* Password Field */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="lock-closed-outline"
@@ -208,6 +217,7 @@ export default function SignUp() {
                 <Text style={styles.errorText}>{errors.password}</Text>
               )}
 
+              {/* Terms and Conditions */}
               <TouchableOpacity
                 style={styles.checkboxContainer}
                 onPress={() =>
@@ -232,6 +242,7 @@ export default function SignUp() {
                 <Text style={styles.errorText}>{errors.acceptTerms}</Text>
               )}
 
+              {/* Submit Button */}
               <TouchableOpacity
                 style={[
                   styles.registerButton,
@@ -247,6 +258,7 @@ export default function SignUp() {
                 )}
               </TouchableOpacity>
 
+              {/* Link to Sign In */}
               <View style={styles.signInContainer}>
                 <Text style={styles.signInText}>Already have an account? </Text>
                 <TouchableOpacity onPress={() => router.push("/signin")}>
@@ -261,10 +273,11 @@ export default function SignUp() {
   );
 }
 
+// All screen styles below
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#efdff1",
+    backgroundColor: "#efdff1", // Light purple background
   },
   content: {
     flex: 1,

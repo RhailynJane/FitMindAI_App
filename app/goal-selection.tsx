@@ -1,21 +1,22 @@
-"use client";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons"; // Importing Ionicons for UI icons
+import { useRouter } from "expo-router"; // Navigation hook from Expo Router
+import { useState } from "react"; // React hook for managing local state
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, // Spinner used during loading state
+  Alert, // Native alert popup
+  Dimensions, // To get screen width
+  Image, // For rendering images
+  SafeAreaView, // Keeps content inside safe device boundaries
+  StyleSheet, // Allows styling components
+  Text, // Text component
+  TouchableOpacity, // Pressable button
+  View, // Basic container component
 } from "react-native";
 
+// Get device screen width
 const { width } = Dimensions.get("window");
 
+// Define available fitness goals
 const goals = [
   { id: "improve-shape", title: "Improve Shape" },
   { id: "lean-tone", title: "Lean & Tone" },
@@ -23,12 +24,14 @@ const goals = [
 ];
 
 export default function GoalSelection() {
-  const [selectedGoal, setSelectedGoal] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const [selectedGoal, setSelectedGoal] = useState(""); // Store selected goal
+  const [isLoading, setIsLoading] = useState(false); // Loading state for button
+  const router = useRouter(); // Initialize navigation
 
+  // Handle "Next" button press
   const handleNext = async () => {
     if (!selectedGoal) {
+      // Show alert if no goal is selected
       Alert.alert(
         "Please select a goal",
         "Choose your fitness goal to continue"
@@ -36,30 +39,33 @@ export default function GoalSelection() {
       return;
     }
 
-    setIsLoading(true);
+    setIsLoading(true); // Show loading spinner
     try {
-      // Here you would typically save the goal to Firebase
+      // Simulate saving selected goal (e.g., to Firebase or local storage)
       console.log("Selected goal:", selectedGoal);
-      // Navigate to sign in
+      // Navigate to sign-in screen
       router.push("/signin");
     } catch (error: any) {
+      // Handle error if saving fails
       Alert.alert("Error", error.message);
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Hide loading spinner
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
+        {/* Top hero image */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: "/placeholder.svg?height=200&width=300" }}
+            source={{ uri: "/placeholder.svg?height=200&width=300" }} // Placeholder image
             style={styles.heroImage}
             resizeMode="contain"
           />
         </View>
 
+        {/* Title and subtitle */}
         <View style={styles.textContainer}>
           <Text style={styles.title}>What is your goal?</Text>
           <Text style={styles.subtitle}>
@@ -67,20 +73,21 @@ export default function GoalSelection() {
           </Text>
         </View>
 
+        {/* Render goal options */}
         <View style={styles.goalsContainer}>
           {goals.map((goal) => (
             <TouchableOpacity
               key={goal.id}
               style={[
                 styles.goalOption,
-                selectedGoal === goal.id && styles.selectedGoalOption,
+                selectedGoal === goal.id && styles.selectedGoalOption, // Highlight selected
               ]}
-              onPress={() => setSelectedGoal(goal.id)}
+              onPress={() => setSelectedGoal(goal.id)} // Update selected goal
             >
               <Text
                 style={[
                   styles.goalText,
-                  selectedGoal === goal.id && styles.selectedGoalText,
+                  selectedGoal === goal.id && styles.selectedGoalText, // Highlight text
                 ]}
               >
                 {goal.title}
@@ -89,13 +96,14 @@ export default function GoalSelection() {
           ))}
         </View>
 
+        {/* Next button */}
         <TouchableOpacity
-          style={[styles.nextButton, isLoading && styles.disabledButton]}
+          style={[styles.nextButton, isLoading && styles.disabledButton]} // Dim if loading
           onPress={handleNext}
-          disabled={isLoading}
+          disabled={isLoading} // Disable button if loading
         >
           {isLoading ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color="white" /> // Show spinner
           ) : (
             <>
               <Text style={styles.nextButtonText}>Next</Text>
@@ -113,10 +121,11 @@ export default function GoalSelection() {
   );
 }
 
+// Stylesheet for layout and UI
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#efdff1",
+    flex: 1, // Take full screen height
+    backgroundColor: "#efdff1", // Light pink background
   },
   content: {
     flex: 1,
@@ -124,15 +133,15 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   imageContainer: {
-    alignItems: "center",
+    alignItems: "center", // Center image
     marginBottom: 40,
   },
   heroImage: {
-    width: width * 0.8,
-    height: width * 0.5,
+    width: width * 0.8, // Responsive width
+    height: width * 0.5, // Responsive height
   },
   textContainer: {
-    alignItems: "center",
+    alignItems: "center", // Center text
     marginBottom: 40,
   },
   title: {
@@ -163,7 +172,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   selectedGoalOption: {
-    backgroundColor: "#92A3FD",
+    backgroundColor: "#92A3FD", // Highlight color
   },
   goalText: {
     fontSize: 16,
@@ -171,7 +180,7 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   selectedGoalText: {
-    color: "white",
+    color: "white", // Invert text color on selection
   },
   nextButton: {
     backgroundColor: "#9512af",
@@ -180,7 +189,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: "auto",
+    marginTop: "auto", // Push button to bottom
     marginBottom: 40,
     shadowColor: "#9512af",
     shadowOffset: { width: 0, height: 4 },
@@ -189,7 +198,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   disabledButton: {
-    opacity: 0.7,
+    opacity: 0.7, // Dim when disabled
   },
   nextButtonText: {
     color: "white",

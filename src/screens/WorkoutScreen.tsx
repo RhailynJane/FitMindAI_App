@@ -1,6 +1,5 @@
-import { RouteProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useEffect, useState } from "react";
+import { router } from "expo-router"; // Expo Router navigation
+import React, { useEffect, useRef, useState } from "react";
 import {
   Image,
   SafeAreaView,
@@ -10,33 +9,27 @@ import {
   View,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import { RootStackParamList } from "../../App";
 
-type WorkoutScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "Workout"
->;
-
-type WorkoutScreenRouteProp = RouteProp<RootStackParamList, "Workout">;
-
-interface Props {
-  navigation: WorkoutScreenNavigationProp;
-  route: WorkoutScreenRouteProp;
-}
-
+// Define the structure of an exercise
 interface Exercise {
   name: string;
   duration: number;
   image: string;
 }
 
-const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
+// Main functional component
+const WorkoutScreen: React.FC = () => {
+  // State for workout logic
   const [isStarted, setIsStarted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentExercise, setCurrentExercise] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [exerciseTime, setExerciseTime] = useState(30);
 
+  // Use ref to store timer ID for proper cleanup
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Temporary hardcoded workout data
   const workoutData = {
     title: "Morning Energizer",
     exercises: [
@@ -63,60 +56,99 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
     ] as Exercise[],
   };
 
+  // Effect to handle countdown and exercise timer
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    // Clear any existing timer
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
 
     if (isStarted && !isPaused) {
       if (countdown > 0) {
-        timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+        // Decrement countdown
+        timerRef.current = setTimeout(
+          () => setCountdown((prev) => prev - 1),
+          1000
+        );
       } else if (exerciseTime > 0) {
-        timer = setTimeout(() => setExerciseTime(exerciseTime - 1), 1000);
+        // Decrement exercise time
+        timerRef.current = setTimeout(
+          () => setExerciseTime((prev) => prev - 1),
+          1000
+        );
       } else {
-        // Move to next exercise or finish workout
+        // Move to next exercise or end workout
         if (currentExercise < workoutData.exercises.length - 1) {
-          setCurrentExercise(currentExercise + 1);
-          setExerciseTime(workoutData.exercises[currentExercise + 1].duration);
+          const nextIndex = currentExercise + 1;
+          setCurrentExercise(nextIndex);
+          setExerciseTime(workoutData.exercises[nextIndex].duration);
           setCountdown(3);
         } else {
-          // Workout complete
-          navigation.navigate("WorkoutComplete");
+          // Navigate to WorkoutComplete screen using Expo Router
+          router.push("/workout-complete");
         }
       }
     }
 
-    return () => clearTimeout(timer);
+    // Cleanup function
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
   }, [
     isStarted,
     isPaused,
     countdown,
     exerciseTime,
     currentExercise,
-    navigation,
     workoutData.exercises,
   ]);
 
-  const togglePause = () => {
-    setIsPaused(!isPaused);
-  };
+  // Cleanup timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
+  // Toggle pause/play
+  const togglePause = () => setIsPaused((prev) => !prev);
+
+  // Skip to next exercise or complete workout
   const skipExercise = () => {
     if (currentExercise < workoutData.exercises.length - 1) {
-      setCurrentExercise(currentExercise + 1);
-      setExerciseTime(workoutData.exercises[currentExercise + 1].duration);
+      const nextIndex = currentExercise + 1;
+      setCurrentExercise(nextIndex);
+      setExerciseTime(workoutData.exercises[nextIndex].duration);
       setCountdown(3);
     } else {
-      navigation.navigate("WorkoutComplete");
+      router.push("/workout-complete");
     }
   };
 
-  const currentExerciseData = workoutData.exercises[currentExercise];
+  // Go back function with timer cleanup
+  const handleGoBack = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    router.back(); // Expo Router back navigation
+  };
 
+  // Safe access to current exercise data
+  const currentExerciseData = workoutData.exercises[currentExercise];
+  if (!currentExerciseData) {
+    return null;
+  }
+
+  // Render pre-workout screen
   if (!isStarted) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.preWorkoutContainer}>
           <Text style={styles.workoutTitle}>{workoutData.title}</Text>
-
           <View style={styles.exerciseList}>
             {workoutData.exercises.map((exercise, index) => (
               <View key={index} style={styles.exerciseItem}>
@@ -132,7 +164,6 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ))}
           </View>
-
           <TouchableOpacity
             style={styles.startButton}
             onPress={() => setIsStarted(true)}
@@ -144,6 +175,7 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
+  // Render countdown before each exercise
   if (countdown > 0) {
     return (
       <SafeAreaView style={styles.container}>
@@ -158,10 +190,11 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
+  // Render active workout screen
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={handleGoBack}>
           <Icon name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{currentExerciseData.name}</Text>
@@ -174,14 +207,19 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.exerciseImage}
         />
 
+        {/* Progress bar */}
         <View style={styles.progressBarContainer}>
           <View
             style={[
               styles.progressBar,
               {
-                width: `${
-                  (exerciseTime / currentExerciseData.duration) * 100
-                }%`,
+                width: `${Math.max(
+                  Math.min(
+                    (exerciseTime / currentExerciseData.duration) * 100,
+                    100
+                  ),
+                  0
+                )}%`,
               },
             ]}
           />
@@ -189,6 +227,7 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <Text style={styles.timerText}>{exerciseTime}</Text>
 
+        {/* Controls */}
         <View style={styles.controlsContainer}>
           <TouchableOpacity style={styles.controlButton} onPress={togglePause}>
             <Icon
@@ -204,6 +243,7 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </View>
 
+      {/* Footer progress tracker */}
       <View style={styles.footer}>
         <View style={styles.progressInfo}>
           <Text style={styles.progressLabel}>Progress</Text>
@@ -216,9 +256,10 @@ const WorkoutScreen: React.FC<Props> = ({ navigation, route }) => {
             style={[
               styles.overallProgressBar,
               {
-                width: `${
-                  (currentExercise / workoutData.exercises.length) * 100
-                }%`,
+                width: `${Math.min(
+                  ((currentExercise + 1) / workoutData.exercises.length) * 100,
+                  100
+                )}%`,
               },
             ]}
           />

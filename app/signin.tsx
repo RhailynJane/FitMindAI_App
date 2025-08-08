@@ -1,62 +1,78 @@
-"use client";
+// Import icon library for UI icons
 import { Ionicons } from "@expo/vector-icons";
+
+// Expo Router for navigation
 import { useRouter } from "expo-router";
+
+// Formik handles form state and validation
 import { Formik } from "formik";
+
+// useState for local state management
 import { useState } from "react";
+
+// React Native components
 import {
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
+  ActivityIndicator, // shows loading spinner
+  Alert, // shows alert dialogs
+  SafeAreaView, // avoids unsafe screen areas
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
+// Yup is used to define form validation schema
 import * as Yup from "yup";
+
+// Custom hook to handle auth actions (sign in, sign out, etc.)
 import { useAuthFunctions } from "../hooks/useAuthFunctions";
 
+// Validation schema using Yup
 const SignInSchema = Yup.object().shape({
   email: Yup.string()
-    .email("Invalid email address")
-    .required("Email is required"),
+    .email("Invalid email address") // Validates proper email format
+    .required("Email is required"), // Field is required
   password: Yup.string()
-    .min(6, "Password must be at least 6 characters")
+    .min(6, "Password must be at least 6 characters") // Minimum length check
     .required("Password is required"),
 });
 
+// TypeScript interface to define shape of form values
 interface SignInFormValues {
   email: string;
   password: string;
 }
 
 export default function SignIn() {
-  const [showPassword, setShowPassword] = useState(false);
-  const { signIn } = useAuthFunctions();
-  const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false); // Toggle visibility of password field
+  const { signIn } = useAuthFunctions(); // Get signIn function from auth hook
+  const router = useRouter(); // Router to navigate to other screens
 
+  // Function to handle sign-in logic
   const handleSignIn = async (values: SignInFormValues) => {
     try {
-      await signIn(values.email, values.password);
-      // Navigate to welcome screen after successful sign in
-      router.push("/welcome-success");
+      await signIn(values.email, values.password); // Attempt to sign in with provided credentials
+      router.push("/welcome-success"); // Redirect on successful login
     } catch (error: any) {
-      Alert.alert("Sign In Failed", error.message);
+      Alert.alert("Sign In Failed", error.message); // Show error if login fails
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
+        {/* Header text */}
         <View style={styles.header}>
           <Text style={styles.greeting}>Hey there,</Text>
           <Text style={styles.title}>Welcome Back</Text>
         </View>
 
+        {/* Formik manages form values and validation */}
         <Formik
           initialValues={{ email: "", password: "" }}
-          validationSchema={SignInSchema}
-          onSubmit={handleSignIn}
+          validationSchema={SignInSchema} // Apply Yup validation
+          onSubmit={handleSignIn} // Submit handler
         >
           {({
             handleChange,
@@ -68,6 +84,7 @@ export default function SignIn() {
             isSubmitting,
           }) => (
             <View style={styles.form}>
+              {/* Email Input Field */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="mail-outline"
@@ -86,10 +103,12 @@ export default function SignIn() {
                   autoCorrect={false}
                 />
               </View>
+              {/* Email validation error */}
               {touched.email && errors.email && (
                 <Text style={styles.errorText}>{errors.email}</Text>
               )}
 
+              {/* Password Input Field */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="lock-closed-outline"
@@ -106,6 +125,7 @@ export default function SignIn() {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
+                {/* Toggle password visibility */}
                 <TouchableOpacity
                   style={styles.eyeIcon}
                   onPress={() => setShowPassword(!showPassword)}
@@ -117,23 +137,26 @@ export default function SignIn() {
                   />
                 </TouchableOpacity>
               </View>
+              {/* Password validation error */}
               {touched.password && errors.password && (
                 <Text style={styles.errorText}>{errors.password}</Text>
               )}
 
+              {/* Forgot Password Link */}
               <TouchableOpacity style={styles.forgotPassword}>
                 <Text style={styles.forgotPasswordText}>
                   Forgot your password?
                 </Text>
               </TouchableOpacity>
 
+              {/* Login Button */}
               <TouchableOpacity
                 style={[
                   styles.loginButton,
                   isSubmitting && styles.disabledButton,
                 ]}
-                onPress={() => handleSubmit()}
-                disabled={isSubmitting}
+                onPress={() => handleSubmit()} // Trigger form submit
+                disabled={isSubmitting} // Disable button when submitting
               >
                 {isSubmitting ? (
                   <ActivityIndicator color="white" />
@@ -150,9 +173,10 @@ export default function SignIn() {
                 )}
               </TouchableOpacity>
 
+              {/* Redirect to Sign Up Screen */}
               <View style={styles.signUpContainer}>
                 <Text style={styles.signUpText}>
-                  Don't have an account yet?{" "}
+                  Dont have an account yet?{" "}
                 </Text>
                 <TouchableOpacity onPress={() => router.push("/signup")}>
                   <Text style={styles.signUpLink}>Register</Text>
@@ -166,16 +190,17 @@ export default function SignIn() {
   );
 }
 
+// StyleSheet for styling all components
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#efdff1",
+    backgroundColor: "#efdff1", // Light lavender background
   },
   content: {
     flex: 1,
     paddingHorizontal: 30,
     paddingTop: 80,
-    justifyContent: "center",
+    justifyContent: "center", // Vertically center content
   },
   header: {
     marginBottom: 60,
@@ -215,7 +240,7 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   errorText: {
-    color: "#ff4444",
+    color: "#ff4444", // Red color for validation error
     fontSize: 12,
     marginBottom: 10,
     marginLeft: 15,
@@ -231,7 +256,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   loginButton: {
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Primary purple color
     borderRadius: 25,
     height: 60,
     flexDirection: "row",
@@ -242,7 +267,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 5, // Android shadow
   },
   disabledButton: {
     opacity: 0.7,

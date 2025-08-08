@@ -1,6 +1,10 @@
+// Load API key from environment variables, fallback to empty string if undefined
 const EXERCISEDB_API_KEY = process.env.EXPO_PUBLIC_EXERCISEDB_API_KEY ?? "";
+
+// Base URL for the ExerciseDB API
 const BASE_URL = "https://exercisedb.p.rapidapi.com";
 
+// TypeScript interface representing an exercise object
 export interface Exercise {
   id: string;
   name: string;
@@ -8,21 +12,24 @@ export interface Exercise {
   target: string;
   equipment: string;
   gifUrl: string;
-  instructions?: string[];
-  secondaryMuscles?: string[];
-  difficulty: string;
-  category: string;
-  description?: string;
+  instructions?: string[]; // Optional array of steps
+  secondaryMuscles?: string[]; // Optional array of supporting muscles
+  difficulty: string; // Custom-calculated field
+  category: string; // Based on bodyPart
+  description?: string; // Auto-generated summary
 }
 
+// Custom error class for when the API is offline
 export class ApiOfflineError extends Error {
   constructor(message: string) {
-    super(message);
-    this.name = "ApiOfflineError";
+    super(message); // Call the parent Error class constructor
+    this.name = "ApiOfflineError"; // Set error name
   }
 }
 
+// Main class handling communication with ExerciseDB API
 class ExerciseApi {
+  // Internal helper to fetch data with required API headers
   private async fetchWithAuth(url: string): Promise<any> {
     try {
       const response = await fetch(url, {
@@ -32,6 +39,7 @@ class ExerciseApi {
         },
       });
 
+      // Handle common error responses
       if (!response.ok) {
         if (response.status === 403) {
           throw new ApiOfflineError(
@@ -48,7 +56,7 @@ class ExerciseApi {
         );
       }
 
-      return response.json();
+      return response.json(); // Parse and return JSON
     } catch (error) {
       console.error("API fetch error:", error);
       if (error instanceof ApiOfflineError) {
@@ -60,18 +68,47 @@ class ExerciseApi {
     }
   }
 
+  // Fetch a list of exercises with optional limit
+  async getExercises(limit = 20): Promise<Exercise[]> {
+    try {
+      const data = await this.fetchWithAuth(
+        `${BASE_URL}/exercises?limit=${limit}`
+      );
+
+      // Transform raw API response into Exercise[] with additional fields
+      return data.map((exercise: any) => ({
+        id: exercise.id,
+        name: exercise.name,
+        bodyPart: exercise.bodyPart,
+        target: exercise.target,
+        equipment: exercise.equipment,
+        gifUrl: exercise.gifUrl,
+        instructions: exercise.instructions || [],
+        secondaryMuscles: exercise.secondaryMuscles || [],
+        difficulty: this.getDifficulty(exercise.equipment),
+        category: exercise.bodyPart,
+        description: `A ${exercise.bodyPart} exercise targeting ${exercise.target} using ${exercise.equipment}.`,
+      })) as Exercise[];
+    } catch (error) {
+      console.error("Error fetching exercises:", error);
+      throw error;
+    }
+  }
+
+  // Fetch a list of all available body parts
   async getBodyParts(): Promise<string[]> {
     try {
       const data = await this.fetchWithAuth(
         `${BASE_URL}/exercises/bodyPartList`
       );
-      return data || [];
+      return data || []; // Fallback to empty array if undefined
     } catch (error) {
       console.error("Error fetching body parts:", error);
       throw error;
     }
   }
 
+  // Fetch exercises filtered by a specific body part
   async getExercisesByBodyPart(
     bodyPart: string,
     limit = 20
@@ -81,6 +118,7 @@ class ExerciseApi {
         `${BASE_URL}/exercises/bodyPart/${bodyPart}?limit=${limit}`
       );
 
+      // Map and normalize data structure
       return data.map((exercise: any) => ({
         id: exercise.id,
         name: exercise.name,
@@ -100,6 +138,7 @@ class ExerciseApi {
     }
   }
 
+  // Fetch a single exercise by ID
   async getExerciseById(id: string): Promise<Exercise> {
     try {
       const data = await this.fetchWithAuth(
@@ -125,12 +164,14 @@ class ExerciseApi {
     }
   }
 
+  // Utility to determine difficulty level based on equipment
   private getDifficulty(equipment: string): string {
     const bodyWeightEquipment = ["body weight", "assisted"];
     const beginnerEquipment = ["dumbbell", "kettlebell", "resistance band"];
     const intermediateEquipment = ["barbell", "cable", "smith machine"];
     const advancedEquipment = ["olympic barbell", "trap bar"];
 
+    // Match equipment to difficulty category
     if (bodyWeightEquipment.includes(equipment.toLowerCase()))
       return "Beginner";
     if (beginnerEquipment.some((eq) => equipment.toLowerCase().includes(eq)))
@@ -142,8 +183,10 @@ class ExerciseApi {
     if (advancedEquipment.some((eq) => equipment.toLowerCase().includes(eq)))
       return "Advanced";
 
+    // Default to Intermediate
     return "Intermediate";
   }
 }
 
+// Export a single instance for reuse across the app
 export const exerciseApi = new ExerciseApi();

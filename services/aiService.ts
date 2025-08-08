@@ -1,32 +1,33 @@
-// AI Service for integrating with various AI providers
-// You can integrate with OpenAI, Google AI, or other providers
+// AI Service for integrating with various AI providers like OpenAI, Google AI, etc.
 
 interface AIResponse {
-  text: string;
-  confidence: number;
+  text: string; // The response text from the AI
+  confidence: number; // Confidence score for the response
 }
 
 interface WorkoutRecommendation {
-  name: string;
-  description: string;
-  exercises: string[];
-  duration: number;
-  difficulty: "Beginner" | "Intermediate" | "Advanced";
+  name: string; // Name of the workout
+  description: string; // Brief description of the workout
+  exercises: string[]; // List of included exercises
+  duration: number; // Duration in minutes
+  difficulty: "Beginner" | "Intermediate" | "Advanced"; // Difficulty level
 }
 
 class AIService {
+  // Store API key from environment variable
   private apiKey: string = process.env.EXPO_PUBLIC_OPENAI_API_KEY || "";
 
-  // Generate workout recommendations based on user profile
+  // Generate a workout recommendation based on the user's fitness profile
   async generateWorkoutRecommendation(userProfile: {
-    fitnessLevel: string;
-    goals: string[];
-    availableTime: number;
-    equipment: string[];
+    fitnessLevel: string; // User's fitness level (Beginner, Intermediate, etc.)
+    goals: string[]; // List of fitness goals (e.g., weight_loss, muscle_gain)
+    availableTime: number; // Time available in minutes
+    equipment: string[]; // Equipment available to the user
   }): Promise<WorkoutRecommendation> {
     try {
-      // This would integrate with a real AI service like OpenAI
-      // For now, we'll return a mock recommendation
+      // Normally, you'd send a request to an AI API like OpenAI
+      // For now, return mock recommendations locally
+
       const recommendations = [
         {
           name: "Beginner Full Body Blast",
@@ -66,21 +67,23 @@ class AIService {
         },
       ];
 
-      // Select recommendation based on fitness level
+      // Map user's fitness level to an index
       const levelMap = {
         beginner: 0,
         intermediate: 1,
         advanced: 2,
       };
 
+      // Get the correct workout based on fitness level, fallback to beginner
       const index =
         levelMap[
           userProfile.fitnessLevel.toLowerCase() as keyof typeof levelMap
         ] || 0;
+
       return recommendations[index];
     } catch (error) {
       console.error("Error generating workout recommendation:", error);
-      // Return fallback recommendation
+      // Fallback workout if AI service fails
       return {
         name: "Basic Fitness Routine",
         description:
@@ -92,14 +95,13 @@ class AIService {
     }
   }
 
-  // Generate personalized fitness advice
+  // Generate basic fitness advice based on user question (rule-based fallback)
   async generateFitnessAdvice(
     question: string,
     userContext?: any
   ): Promise<AIResponse> {
     try {
-      // This would integrate with a real AI service
-      // For now, we'll use rule-based responses
+      // Call rule-based advice generator instead of AI for now
       const advice = this.generateRuleBasedAdvice(question);
       return {
         text: advice,
@@ -107,6 +109,7 @@ class AIService {
       };
     } catch (error) {
       console.error("Error generating fitness advice:", error);
+      // Fallback response on error
       return {
         text: "I'm sorry, I'm having trouble generating advice right now. Please try again later.",
         confidence: 0.1,
@@ -114,15 +117,16 @@ class AIService {
     }
   }
 
-  // Analyze workout performance and provide insights
+  // Analyze workout performance data and return personalized insights
   async analyzeWorkoutPerformance(workoutData: {
-    exercises: string[];
-    duration: number;
-    intensity: number;
-    completionRate: number;
+    exercises: string[]; // List of exercises performed
+    duration: number; // Workout duration in minutes
+    intensity: number; // Intensity on a scale of 1–10
+    completionRate: number; // Completion percentage (0 to 1)
   }): Promise<string[]> {
     const insights: string[] = [];
 
+    // Analyze based on completion rate
     if (workoutData.completionRate >= 0.9) {
       insights.push(
         "Excellent job completing your workout! Your consistency is paying off."
@@ -137,12 +141,14 @@ class AIService {
       );
     }
 
+    // Analyze based on duration
     if (workoutData.duration < 20) {
       insights.push("Consider extending your workout time for better results.");
     } else if (workoutData.duration > 60) {
       insights.push("Great endurance! Make sure you're not overtraining.");
     }
 
+    // Analyze based on intensity
     if (workoutData.intensity > 8) {
       insights.push(
         "High intensity workout! Make sure to get adequate rest and recovery."
@@ -152,34 +158,38 @@ class AIService {
     return insights;
   }
 
-  // Generate meal suggestions based on fitness goals
+  // Generate meal suggestions based on fitness goals and dietary restrictions
   async generateMealSuggestions(
     goals: string[],
     dietaryRestrictions: string[] = []
   ): Promise<string[]> {
     const mealSuggestions: string[] = [];
 
+    // Suggestions for weight loss
     if (goals.includes("weight_loss")) {
       mealSuggestions.push("Grilled chicken salad with mixed vegetables");
       mealSuggestions.push("Quinoa bowl with roasted vegetables");
       mealSuggestions.push("Greek yogurt with berries and nuts");
     }
 
+    // Suggestions for muscle gain
     if (goals.includes("muscle_gain")) {
       mealSuggestions.push("Protein smoothie with banana and peanut butter");
       mealSuggestions.push("Lean beef with sweet potato and broccoli");
       mealSuggestions.push("Salmon with quinoa and asparagus");
     }
 
+    // Suggestions for endurance training
     if (goals.includes("endurance")) {
       mealSuggestions.push("Oatmeal with fruits and nuts");
       mealSuggestions.push("Whole grain pasta with lean protein");
       mealSuggestions.push("Energy balls with dates and almonds");
     }
 
-    return mealSuggestions.slice(0, 5); // Return top 5 suggestions
+    return mealSuggestions.slice(0, 5); // Return up to 5 top suggestions
   }
 
+  // Generate rule-based fitness advice based on user question keywords
   private generateRuleBasedAdvice(question: string): string {
     const lowerQuestion = question.toLowerCase();
 
@@ -212,49 +222,45 @@ class AIService {
       return "Staying motivated requires setting realistic goals, tracking progress, and celebrating small wins. Find activities you enjoy and consider working out with a friend for accountability.";
     }
 
+    // Default fallback advice
     return "That's a great question! Focus on consistency, proper form, and gradual progression in your fitness journey. Remember, small steps lead to big changes over time.";
   }
 
-  // Integration method for real AI services (OpenAI, Google AI, etc.)
+  // Placeholder method for integrating with real AI providers like OpenAI
   async callExternalAI(prompt: string): Promise<string> {
-    try {
-      // Example integration with OpenAI (you would need to install openai package)
-      // Uncomment and use the following code for real integration:
-      /*
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a professional fitness coach. Provide helpful, accurate, and motivating fitness advice.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          max_tokens: 150,
-          temperature: 0.7,
-        }),
-      });
+    // Example for future implementation using OpenAI
+    /*
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional fitness coach. Provide helpful, accurate, and motivating fitness advice.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.7,
+      }),
+    });
 
-      const data = await response.json();
-      return data.choices[0].message.content;
-      */
+    const data = await response.json();
+    return data.choices[0].message.content;
+    */
 
-      // For now, return a placeholder
-      return "AI integration coming soon! For now, I'm using rule-based responses to help you with your fitness journey.";
-    } catch (error) {
-      console.error("Error calling external AI:", error);
-      throw error;
-    }
+    // Fallback for now while integration is not active
+    return "AI integration coming soon! For now, I'm using rule-based responses to help you with your fitness journey.";
   }
 }
 
+// Export a singleton instance of AIService
 export const aiService = new AIService();

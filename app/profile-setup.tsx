@@ -1,4 +1,3 @@
-"use client";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
@@ -19,8 +18,10 @@ import {
 } from "react-native";
 import * as Yup from "yup";
 
+// Get screen width for responsive design
 const { width } = Dimensions.get("window");
 
+// Validation schema for form inputs using Yup
 const ProfileSetupSchema = Yup.object().shape({
   gender: Yup.string().required("Please select your gender"),
   dateOfBirth: Yup.string().required("Date of birth is required"),
@@ -34,6 +35,7 @@ const ProfileSetupSchema = Yup.object().shape({
     .required("Height is required"),
 });
 
+// Define the shape of the form values
 interface ProfileSetupFormValues {
   gender: string;
   dateOfBirth: string;
@@ -41,6 +43,7 @@ interface ProfileSetupFormValues {
   height: string;
 }
 
+// Options for gender selection
 const genderOptions = ["Male", "Female", "Other"];
 
 export default function ProfileSetup() {
@@ -49,17 +52,18 @@ export default function ProfileSetup() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const router = useRouter();
 
+  // Submit handler for profile setup form
   const handleProfileSetup = async (values: ProfileSetupFormValues) => {
     try {
-      // Here you would typically save the profile data to Firebase
+      // Simulate saving data
       console.log("Profile data:", values);
-      // Navigate to goal selection
-      router.push("/goal-selection");
+      router.push("/goal-selection"); // Navigate to next screen
     } catch (error: any) {
       Alert.alert("Profile Setup Failed", error.message);
     }
   };
 
+  // Format date to locale string for display
   const formatDate = (date: Date) => {
     return date.toLocaleDateString();
   };
@@ -67,6 +71,7 @@ export default function ProfileSetup() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
+        {/* Top image */}
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: "/placeholder.svg?height=200&width=200" }}
@@ -75,13 +80,15 @@ export default function ProfileSetup() {
           />
         </View>
 
+        {/* Heading and subheading */}
         <View style={styles.textContainer}>
-          <Text style={styles.title}>Let's complete your profile</Text>
+          <Text style={styles.title}>Lets complete your profile</Text>
           <Text style={styles.subtitle}>
             It will help us to know more about you!
           </Text>
         </View>
 
+        {/* Form using Formik */}
         <Formik
           initialValues={{
             gender: "",
@@ -103,6 +110,7 @@ export default function ProfileSetup() {
             setFieldValue,
           }) => (
             <View style={styles.form}>
+              {/* Gender Picker Input */}
               <TouchableOpacity
                 style={styles.inputContainer}
                 onPress={() => setShowGenderPicker(!showGenderPicker)}
@@ -124,6 +132,7 @@ export default function ProfileSetup() {
                 <Text style={styles.errorText}>{errors.gender}</Text>
               )}
 
+              {/* Gender Options */}
               {showGenderPicker && (
                 <View style={styles.pickerContainer}>
                   {genderOptions.map((option) => (
@@ -141,6 +150,7 @@ export default function ProfileSetup() {
                 </View>
               )}
 
+              {/* Date Picker */}
               <TouchableOpacity
                 style={styles.inputContainer}
                 onPress={() => setShowDatePicker(true)}
@@ -182,6 +192,7 @@ export default function ProfileSetup() {
                 />
               )}
 
+              {/* Weight Input */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="fitness-outline"
@@ -205,6 +216,7 @@ export default function ProfileSetup() {
                 <Text style={styles.errorText}>{errors.weight}</Text>
               )}
 
+              {/* Height Input */}
               <View style={styles.inputContainer}>
                 <Ionicons
                   name="resize-outline"
@@ -228,6 +240,7 @@ export default function ProfileSetup() {
                 <Text style={styles.errorText}>{errors.height}</Text>
               )}
 
+              {/* Submit Button */}
               <TouchableOpacity
                 style={[
                   styles.nextButton,
@@ -258,6 +271,7 @@ export default function ProfileSetup() {
   );
 }
 
+// Styles for the component
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -20,22 +20,44 @@ import {
   type UserWorkout,
 } from "../../services/firestoreService";
 
+// Get device width for responsive design calculations
 const { width } = Dimensions.get("window");
 
+/**
+ * WorkoutPlansScreen Component
+ *
+ * Main screen for displaying and managing workout plans. Features:
+ * - AI coach recommendations with custom illustrations
+ * - Tab navigation between featured workouts and user's personal plans
+ * - CRUD operations for user workouts (view, start, delete)
+ * - Interactive cards with gradient backgrounds and progress tracking
+ * - Empty state handling with call-to-action buttons
+ */
 export default function WorkoutPlansScreen() {
+  // Authentication and navigation hooks
   const { user } = useAuth();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets(); // For safe area handling on different devices
+
+  // Component state management
   const [workouts, setWorkouts] = useState<UserWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"start" | "myPlans">("start");
 
+  /**
+   * Load user workouts when component mounts or user changes
+   * Automatically fetches and sets workout data from Firestore
+   */
   useEffect(() => {
     if (user) {
       loadWorkouts();
     }
   }, [user]);
 
+  /**
+   * Fetches user's workout plans from Firestore
+   * Handles loading states and error cases gracefully
+   */
   const loadWorkouts = async () => {
     if (!user) return;
 
@@ -51,6 +73,11 @@ export default function WorkoutPlansScreen() {
     }
   };
 
+  /**
+   * Handles workout deletion with confirmation dialog
+   * @param workoutId - Unique identifier for the workout to delete
+   * @param workoutName - Display name for confirmation dialog
+   */
   const handleDeleteWorkout = async (
     workoutId: string,
     workoutName: string
@@ -70,6 +97,7 @@ export default function WorkoutPlansScreen() {
             try {
               console.log("Deleting workout:", workoutId);
               await firestoreService.deleteUserWorkout(workoutId);
+              // Optimistically update UI by removing from local state
               setWorkouts((prevWorkouts) =>
                 prevWorkouts.filter((w) => w.id !== workoutId)
               );
@@ -87,16 +115,23 @@ export default function WorkoutPlansScreen() {
     );
   };
 
+  /**
+   * Initiates a workout session and navigates to workout screen
+   * Creates a new session in Firestore and navigates to session view
+   * @param workout - The workout plan to start
+   */
   const startWorkout = async (workout: UserWorkout) => {
     if (!user) return;
 
     try {
       console.log("Starting workout:", workout.name);
+      // Create new workout session in Firestore
       const sessionId = await firestoreService.startWorkoutSession(
         user.uid,
         workout.id,
         workout
       );
+      // Navigate to workout session screen with session ID
       router.push(`/workout-session/${sessionId}`);
     } catch (error) {
       console.error("Error starting workout:", error);
@@ -104,13 +139,18 @@ export default function WorkoutPlansScreen() {
     }
   };
 
+  /**
+   * Navigates to AI chat for personalized workout recommendations
+   */
   const handleAICoachRecommendation = () => {
     router.push("/ai-chat");
   };
 
+  // Loading state UI - shown while fetching workout data
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Header with loading state */}
         <View style={styles.header}>
           <Ionicons name="menu" size={24} color="#333" />
           <Text style={styles.headerTitle}>Workout Plans</Text>
@@ -125,9 +165,12 @@ export default function WorkoutPlansScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header Section */}
+      {/* Navigation header with menu icon and title */}
       <View style={styles.header}>
         <Ionicons name="menu" size={24} color="#333" />
         <Text style={styles.headerTitle}>Workout Plans</Text>
+        {/* Spacer for center alignment */}
         <View style={{ width: 24 }} />
       </View>
 
@@ -135,15 +178,18 @@ export default function WorkoutPlansScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
+          // Platform-specific bottom padding for tab bar clearance
           paddingBottom: Platform.OS === "ios" ? 100 : 80,
         }}
       >
-        {/* AI Coach Recommendations */}
+        {/* AI Coach Recommendations Section */}
+        {/* Gradient card promoting AI-powered workout recommendations */}
         <LinearGradient
-          colors={["#F8E8FF", "#E8D5FF"]}
+          colors={["#F8E8FF", "#E8D5FF"]} // Light purple gradient
           style={styles.aiCoachCard}
         >
           <View style={styles.aiCoachContent}>
+            {/* Text content for AI coach section */}
             <View style={styles.aiCoachText}>
               <Text style={styles.aiCoachTitle}>AI Coach Recommendations</Text>
               <Text style={styles.aiCoachDescription}>
@@ -160,8 +206,11 @@ export default function WorkoutPlansScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Custom illustration of person exercising */}
             <View style={styles.aiCoachIllustration}>
               <View style={styles.personIllustration}>
+                {/* SVG-style person made with React Native Views */}
                 <View style={styles.personHead} />
                 <View style={styles.personBody} />
                 <View style={styles.personArm} />
@@ -173,7 +222,8 @@ export default function WorkoutPlansScreen() {
           </View>
         </LinearGradient>
 
-        {/* Tab Selector */}
+        {/* Tab Navigation */}
+        {/* Toggle between featured workouts and user's personal plans */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === "start" && styles.activeTab]}
@@ -198,28 +248,35 @@ export default function WorkoutPlansScreen() {
                 activeTab === "myPlans" && styles.activeTabText,
               ]}
             >
+              {/* Show workout count in tab title */}
               My Plans ({workouts.length})
             </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Tab Content - Featured Workouts */}
         {activeTab === "start" ? (
           <View>
-            {/* Featured Workout Card */}
+            {/* Featured Workout Card - Balance Boost */}
+            {/* Promotional card for featured yoga/strength workout */}
             <LinearGradient
-              colors={["#FF6B9D", "#C44CAE"]}
+              colors={["#FF6B9D", "#C44CAE"]} // Pink gradient
               style={styles.featuredCard}
             >
               <View style={styles.featuredContent}>
+                {/* Workout description */}
                 <View style={styles.featuredText}>
                   <Text style={styles.featuredTitle}>Balance Boost</Text>
                   <Text style={styles.featuredDescription}>
                     Gentle yoga, along with strength training
                   </Text>
                 </View>
+
+                {/* Custom yoga person illustration */}
                 <View style={styles.featuredIllustration}>
                   <View style={styles.yogaPersonContainer}>
                     <View style={styles.yogaPerson}>
+                      {/* Stylized yoga pose figure */}
                       <View style={styles.yogaHead} />
                       <View style={styles.yogaBody} />
                       <View style={styles.yogaArm} />
@@ -230,6 +287,9 @@ export default function WorkoutPlansScreen() {
                   </View>
                 </View>
               </View>
+
+              {/* Workout Statistics */}
+              {/* Display key metrics for the workout plan */}
               <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
                   <Text style={styles.statNumber}>50</Text>
@@ -244,12 +304,15 @@ export default function WorkoutPlansScreen() {
                   <Text style={styles.statLabel}>points</Text>
                 </View>
               </View>
+
+              {/* Call-to-action button */}
               <TouchableOpacity style={styles.startPlanButton}>
                 <Text style={styles.startPlanButtonText}>Start Plan</Text>
               </TouchableOpacity>
             </LinearGradient>
 
-            {/* Transformation Challenge */}
+            {/* Transformation Challenge Card */}
+            {/* Secondary promotional card for 30-day challenge */}
             <LinearGradient
               colors={["#FF6B9D", "#C44CAE"]}
               style={styles.transformationCard}
@@ -263,14 +326,18 @@ export default function WorkoutPlansScreen() {
             </LinearGradient>
           </View>
         ) : (
+          /* Tab Content - User's Personal Plans */
           <View>
+            {/* Empty State - No Workouts */}
             {workouts.length === 0 ? (
               <View style={styles.emptyContainer}>
+                {/* Empty state illustration */}
                 <Ionicons name="fitness-outline" size={64} color="#ccc" />
                 <Text style={styles.emptyTitle}>No workout plans yet</Text>
                 <Text style={styles.emptyText}>
                   Add exercises to create your first workout plan!
                 </Text>
+                {/* Call-to-action to browse exercises */}
                 <TouchableOpacity
                   style={styles.browseButton}
                   onPress={() => router.push("/(tabs)/workout")}
@@ -279,16 +346,20 @@ export default function WorkoutPlansScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
+              /* User's Workout Plans List */
+              /* Dynamic list of user-created workout plans */
               workouts.map((workout, index) => (
                 <LinearGradient
                   key={workout.id}
+                  // Alternate gradient colors for visual variety
                   colors={
                     index % 2 === 0
-                      ? ["#FF6B9D", "#C44CAE"]
-                      : ["#6B73FF", "#4E54C8"]
+                      ? ["#FF6B9D", "#C44CAE"] // Pink gradient
+                      : ["#6B73FF", "#4E54C8"] // Blue gradient
                   }
                   style={styles.workoutCard}
                 >
+                  {/* Workout Header with Info and Delete Button */}
                   <View style={styles.workoutHeader}>
                     <View style={styles.workoutInfo}>
                       <Text style={styles.workoutName}>{workout.name}</Text>
@@ -298,6 +369,7 @@ export default function WorkoutPlansScreen() {
                         {workout.category}
                       </Text>
                     </View>
+                    {/* Delete workout button */}
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() =>
@@ -308,13 +380,18 @@ export default function WorkoutPlansScreen() {
                     </TouchableOpacity>
                   </View>
 
+                  {/* Progress Indicator */}
+                  {/* Shows workout completion percentage */}
                   <View style={styles.progressContainer}>
                     <Text style={styles.progressText}>48% complete</Text>
                     <View style={styles.progressBar}>
+                      {/* Progress bar fill - TODO: Make dynamic based on actual progress */}
                       <View style={[styles.progressFill, { width: "48%" }]} />
                     </View>
                   </View>
 
+                  {/* Workout Statistics */}
+                  {/* Display workout duration and session count */}
                   <View style={styles.workoutStatsContainer}>
                     <View style={styles.workoutStatItem}>
                       <Text style={styles.workoutStatNumber}>30</Text>
@@ -326,6 +403,8 @@ export default function WorkoutPlansScreen() {
                     </View>
                   </View>
 
+                  {/* Continue Workout Button */}
+                  {/* Primary action to start/continue the workout */}
                   <TouchableOpacity
                     style={styles.continueButton}
                     onPress={() => startWorkout(workout)}
@@ -343,10 +422,13 @@ export default function WorkoutPlansScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Main container with light background
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+
+  // Header with navigation elements and bottom border
   header: {
     backgroundColor: "white",
     paddingHorizontal: 20,
@@ -357,80 +439,110 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+
+  // Header title styling
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#333",
   },
+
+  // Loading state container - centered content
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Main scrollable content area
   content: {
     flex: 1,
     padding: 20,
   },
+
+  // AI Coach recommendation card styling
   aiCoachCard: {
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
   },
+
+  // Horizontal layout for AI coach content and illustration
   aiCoachContent: {
     flexDirection: "row",
     alignItems: "center",
   },
+
+  // Text content area with right padding for illustration space
   aiCoachText: {
     flex: 1,
     paddingRight: 15,
   },
+
+  // AI coach section title
   aiCoachTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#333",
     marginBottom: 8,
   },
+
+  // AI coach description text
   aiCoachDescription: {
     fontSize: 12,
     color: "#666",
     lineHeight: 16,
     marginBottom: 15,
   },
+
+  // CTA button for AI coach recommendations
   aiCoachButton: {
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Brand purple color
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    alignSelf: "flex-start",
+    alignSelf: "flex-start", // Size to content
   },
+
+  // AI coach button text styling
   aiCoachButtonText: {
     color: "white",
     fontSize: 12,
     fontWeight: "600",
   },
+
+  // Container for AI coach illustration
   aiCoachIllustration: {
     width: 80,
     height: 80,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Base container for person illustration
   personIllustration: {
-    position: "relative",
+    position: "relative", // For absolute positioned arms/legs
   },
+
+  // Person's head - circular shape
   personHead: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#FFB6C1",
+    backgroundColor: "#FFB6C1", // Light pink for skin
     marginBottom: 2,
   },
+
+  // Person's body - rounded rectangle
   personBody: {
     width: 16,
     height: 25,
-    backgroundColor: "#FF69B4",
+    backgroundColor: "#FF69B4", // Hot pink for clothing
     borderRadius: 8,
     marginBottom: 2,
   },
+
+  // Person's left arm - positioned and rotated
   personArm: {
     position: "absolute",
     width: 3,
@@ -441,21 +553,29 @@ const styles = StyleSheet.create({
     left: -5,
     transform: [{ rotate: "-30deg" }],
   },
+
+  // Person's right arm - mirrored positioning
   personArmRight: {
     left: 18,
     transform: [{ rotate: "30deg" }],
   },
+
+  // Person's leg styling
   personLeg: {
     width: 4,
     height: 20,
-    backgroundColor: "#333",
+    backgroundColor: "#333", // Dark color for pants/legs
     borderRadius: 2,
     marginLeft: 2,
   },
+
+  // Right leg positioning
   personLegRight: {
     marginLeft: 10,
-    marginTop: -20,
+    marginTop: -20, // Overlap to create proper leg positioning
   },
+
+  // Tab container with rounded background
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#f0f0f0",
@@ -463,63 +583,89 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 20,
   },
+
+  // Individual tab styling
   tab: {
     flex: 1,
     paddingVertical: 12,
     alignItems: "center",
     borderRadius: 20,
   },
+
+  // Active tab background
   activeTab: {
     backgroundColor: "#333",
   },
+
+  // Default tab text color
   tabText: {
     fontSize: 14,
     fontWeight: "500",
     color: "#666",
   },
+
+  // Active tab text color
   activeTabText: {
     color: "white",
   },
+
+  // Featured workout card with gradient background
   featuredCard: {
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
   },
+
+  // Horizontal layout for featured workout content
   featuredContent: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
   },
+
+  // Text area for featured workout
   featuredText: {
     flex: 1,
   },
+
+  // Featured workout title
   featuredTitle: {
     fontSize: 20,
     fontWeight: "bold",
     color: "white",
     marginBottom: 4,
   },
+
+  // Featured workout description
   featuredDescription: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.9)",
+    color: "rgba(255,255,255,0.9)", // Semi-transparent white
   },
+
+  // Container for featured workout illustration
   featuredIllustration: {
     width: 80,
     height: 80,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Background circle for yoga person illustration
   yogaPersonContainer: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.2)", // Semi-transparent white
     borderRadius: 40,
     width: 80,
     height: 80,
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Base container for yoga person figure
   yogaPerson: {
     position: "relative",
   },
+
+  // Yoga person's head
   yogaHead: {
     width: 16,
     height: 16,
@@ -527,6 +673,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFB6C1",
     marginBottom: 2,
   },
+
+  // Yoga person's body
   yogaBody: {
     width: 12,
     height: 20,
@@ -534,6 +682,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 2,
   },
+
+  // Yoga person's left arm - yoga pose position
   yogaArm: {
     position: "absolute",
     width: 2,
@@ -542,12 +692,16 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     top: 18,
     left: -4,
-    transform: [{ rotate: "-45deg" }],
+    transform: [{ rotate: "-45deg" }], // Yoga pose angle
   },
+
+  // Yoga person's right arm
   yogaArmRight: {
     left: 14,
     transform: [{ rotate: "45deg" }],
   },
+
+  // Yoga person's left leg - bent for yoga pose
   yogaLeg: {
     width: 3,
     height: 15,
@@ -556,58 +710,82 @@ const styles = StyleSheet.create({
     marginLeft: 1,
     transform: [{ rotate: "-20deg" }],
   },
+
+  // Yoga person's right leg
   yogaLegRight: {
     marginLeft: 8,
     marginTop: -15,
     transform: [{ rotate: "20deg" }],
   },
+
+  // Container for workout statistics display
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginBottom: 20,
   },
+
+  // Individual stat item (days, workouts, points)
   statItem: {
     alignItems: "center",
   },
+
+  // Large number display for stats
   statNumber: {
     fontSize: 24,
     fontWeight: "bold",
     color: "white",
   },
+
+  // Label below stat numbers
   statLabel: {
     fontSize: 12,
     color: "rgba(255,255,255,0.8)",
   },
+
+  // Primary button for starting featured workout
   startPlanButton: {
     backgroundColor: "white",
     paddingVertical: 12,
     borderRadius: 25,
     alignItems: "center",
   },
+
+  // Start plan button text (brand color on white background)
   startPlanButtonText: {
     color: "#9512af",
     fontSize: 16,
     fontWeight: "600",
   },
+
+  // Secondary promotional card for transformation challenge
   transformationCard: {
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
   },
+
+  // Transformation card title
   transformationTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "white",
     marginBottom: 4,
   },
+
+  // Transformation card subtitle
   transformationSubtitle: {
     fontSize: 14,
     color: "rgba(255,255,255,0.9)",
   },
+
+  // Empty state container when user has no workouts
   emptyContainer: {
     alignItems: "center",
     paddingVertical: 60,
   },
+
+  // Empty state title text
   emptyTitle: {
     fontSize: 20,
     fontWeight: "600",
@@ -615,94 +793,132 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
+
+  // Empty state description text
   emptyText: {
     fontSize: 14,
     color: "#999",
     textAlign: "center",
     marginBottom: 24,
   },
+
+  // CTA button for empty state
   browseButton: {
     backgroundColor: "#9512af",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
   },
+
+  // Browse button text styling
   browseButtonText: {
     color: "white",
     fontSize: 14,
     fontWeight: "600",
   },
+
+  // User's workout plan cards
   workoutCard: {
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
   },
+
+  // Header area of workout card with delete button
   workoutHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 15,
   },
+
+  // Workout information area (name and description)
   workoutInfo: {
     flex: 1,
   },
+
+  // Workout name/title styling
   workoutName: {
     fontSize: 18,
     fontWeight: "bold",
     color: "white",
     marginBottom: 4,
   },
+
+  // Workout description (exercise count and category)
   workoutDescription: {
     fontSize: 14,
     color: "rgba(255,255,255,0.9)",
   },
+
+  // Delete button with semi-transparent background
   deleteButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: "rgba(255,255,255,0.2)",
   },
+
+  // Progress section container
   progressContainer: {
     marginBottom: 15,
   },
+
+  // Progress percentage text
   progressText: {
     fontSize: 12,
     color: "rgba(255,255,255,0.8)",
     marginBottom: 8,
     textAlign: "right",
   },
+
+  // Progress bar background
   progressBar: {
     height: 4,
     backgroundColor: "rgba(255,255,255,0.3)",
     borderRadius: 2,
   },
+
+  // Progress bar fill (represents completion percentage)
   progressFill: {
     height: "100%",
     backgroundColor: "white",
     borderRadius: 2,
   },
+
+  // Container for workout-specific statistics
   workoutStatsContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginBottom: 20,
   },
+
+  // Individual workout stat item
   workoutStatItem: {
     alignItems: "center",
   },
+
+  // Workout stat number (smaller than featured stats)
   workoutStatNumber: {
     fontSize: 20,
     fontWeight: "bold",
     color: "white",
   },
+
+  // Workout stat label
   workoutStatLabel: {
     fontSize: 12,
     color: "rgba(255,255,255,0.8)",
   },
+
+  // Continue workout button (primary action)
   continueButton: {
     backgroundColor: "white",
     paddingVertical: 12,
     borderRadius: 25,
     alignItems: "center",
   },
+
+  // Continue button text styling
   continueButtonText: {
     color: "#9512af",
     fontSize: 16,

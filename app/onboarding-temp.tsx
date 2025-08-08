@@ -1,8 +1,6 @@
-"use client";
-
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons"; // Import icon set from Expo (Ionicons used for navigation arrow)
+import { useRouter } from "expo-router"; // Router hook for programmatic navigation
+import { useRef, useState } from "react"; // React hooks for managing state and references
 import {
   Dimensions,
   SafeAreaView,
@@ -11,11 +9,14 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
-import { PlaceholderImage } from "../components/PlaceholderImage";
+} from "react-native"; // Core React Native components
 
+import { PlaceholderImage } from "../components/PlaceholderImage"; // Custom component to show placeholder images
+
+// Get the screen width and height for responsive layout
 const { width, height } = Dimensions.get("window");
 
+// Define the shape of each onboarding slide
 interface OnboardingSlide {
   id: number;
   title: string;
@@ -23,6 +24,7 @@ interface OnboardingSlide {
   imageName: string;
 }
 
+// Onboarding slide data
 const onboardingData: OnboardingSlide[] = [
   {
     id: 1,
@@ -48,24 +50,26 @@ const onboardingData: OnboardingSlide[] = [
 ];
 
 export default function Onboarding() {
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const router = useRouter();
+  const [currentSlide, setCurrentSlide] = useState(0); // State to track the current slide index
+  const scrollViewRef = useRef<ScrollView>(null); // Reference to control ScrollView programmatically
+  const router = useRouter(); // Router object for screen navigation
 
+  // Function to go to the next slide or navigate to signup after the last one
   const nextSlide = () => {
     if (currentSlide < onboardingData.length - 1) {
       const nextIndex = currentSlide + 1;
-      setCurrentSlide(nextIndex);
+      setCurrentSlide(nextIndex); // Update current slide state
       scrollViewRef.current?.scrollTo({
-        x: nextIndex * width,
-        animated: true,
+        x: nextIndex * width, // Scroll to the next slide
+        animated: true, // Smooth animation
       });
     } else {
-      // Last slide, go directly to signup
+      // If on last slide, redirect to signup screen
       router.push("/signup");
     }
   };
 
+  // Handle manual scroll (swipe) and update slide index accordingly
   const handleScroll = (event: any) => {
     const slideIndex = Math.round(event.nativeEvent.contentOffset.x / width);
     setCurrentSlide(slideIndex);
@@ -73,23 +77,26 @@ export default function Onboarding() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {" "}
+      {/* Ensures content stays within safe bounds (notches, status bar) */}
       <View style={styles.content}>
         <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={handleScroll}
+          ref={scrollViewRef} // Assign ref for programmatic scrolling
+          horizontal // Enable horizontal swiping
+          pagingEnabled // Snap scroll to full pages
+          showsHorizontalScrollIndicator={false} // Hide scroll bar
+          onMomentumScrollEnd={handleScroll} // Detect when user finishes a swipe
           style={styles.scrollView}
         >
+          {/* Render each onboarding slide */}
           {onboardingData.map((slide, index) => (
             <View key={slide.id} style={styles.slide}>
               <View style={styles.imageContainer}>
                 <View style={styles.imageCircle}>
                   <PlaceholderImage
-                    width={width * 0.6}
-                    height={width * 0.4}
-                    text={slide.imageName}
+                    width={width * 0.6} // Responsive image width
+                    height={width * 0.4} // Responsive image height
+                    text={slide.imageName} // Label shown in image
                     style={styles.slideImage}
                   />
                 </View>
@@ -103,20 +110,20 @@ export default function Onboarding() {
           ))}
         </ScrollView>
 
-        {/* Pagination Dots */}
+        {/* Pagination dots at the bottom */}
         <View style={styles.pagination}>
           {onboardingData.map((_, index) => (
             <View
               key={index}
               style={[
                 styles.paginationDot,
-                index === currentSlide && styles.paginationDotActive,
+                index === currentSlide && styles.paginationDotActive, // Highlight current dot
               ]}
             />
           ))}
         </View>
 
-        {/* Next Button */}
+        {/* Next button to go to next slide or signup */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.nextButton} onPress={nextSlide}>
             <Ionicons name="arrow-forward" size={24} color="white" />
@@ -127,10 +134,11 @@ export default function Onboarding() {
   );
 }
 
+// Stylesheet for the onboarding screen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#efdff1",
+    backgroundColor: "#efdff1", // Light purple background
   },
   content: {
     flex: 1,
@@ -139,7 +147,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   slide: {
-    width,
+    width, // Full screen width
     flex: 1,
     paddingHorizontal: 30,
     paddingTop: 60,
@@ -155,11 +163,11 @@ const styles = StyleSheet.create({
   imageCircle: {
     width: width * 0.8,
     height: width * 0.6,
-    borderRadius: (width * 0.8) / 2,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: (width * 0.8) / 2, // Make it circular
+    backgroundColor: "rgba(255, 255, 255, 0.3)", // Transparent white background
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
+    overflow: "hidden", // Clip image to circle
   },
   slideImage: {
     borderRadius: (width * 0.6) / 2,
@@ -167,8 +175,8 @@ const styles = StyleSheet.create({
   textContainer: {
     alignItems: "center",
     paddingHorizontal: 20,
-    marginBottom: 100, // Space for pagination and button
-    minHeight: 120, // Ensure consistent height
+    marginBottom: 100, // Room for pagination + button
+    minHeight: 120,
   },
   slideTitle: {
     fontSize: 24,
@@ -198,11 +206,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "rgba(149, 18, 175, 0.3)",
+    backgroundColor: "rgba(149, 18, 175, 0.3)", // Inactive dot color
     marginHorizontal: 4,
   },
   paginationDotActive: {
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Active dot color
     width: 20,
   },
   buttonContainer: {
@@ -216,7 +224,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Purple background
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#9512af",
