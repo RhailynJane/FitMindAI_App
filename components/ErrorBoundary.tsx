@@ -22,7 +22,7 @@ export default class ErrorBoundary extends React.Component<
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <Text>Something went wrong</Text> {/* Must use Text */}
+          <Text>Something went wrong</Text>
         </View>
       );
     }
