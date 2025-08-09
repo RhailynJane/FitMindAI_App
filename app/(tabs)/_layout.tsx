@@ -1,60 +1,122 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { Platform, View } from "react-native";
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarActiveTintColor: "#9512af",
+        tabBarInactiveTintColor: "#999",
+        tabBarShowLabel: false,
+
         tabBarStyle: {
           backgroundColor: "white",
           borderTopWidth: 1,
-          borderTopColor: "#eee",
-          height: 60,
-          paddingBottom: 8,
+          borderTopColor: "#f0f0f0",
+          height: Platform.OS === "ios" ? 80 : 100,
+          paddingBottom: Platform.OS === "ios" ? 20 : 8,
           paddingTop: 8,
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 8,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
         },
-        tabBarActiveTintColor: "#9512af",
-        tabBarInactiveTintColor: "#ccc",
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "600",
-        },
+
+        tabBarIcon: ({ color, size, focused }) => (
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          />
+        ),
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: "Workouts",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="fitness-outline" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="home" size={size} color={color} />
+            </View>
           ),
         }}
       />
+
       <Tabs.Screen
-        name="calendar"
+        name="workout"
         options={{
-          title: "Calendar",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="fitness" size={size} color={color} />
+            </View>
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="workout-plans"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="calendar" size={size} color={color} />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="challenges"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="trophy" size={size} color={color} />
+            </View>
+          ),
+        }}
+      />
+
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: "Settings",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Ionicons name="person" size={size} color={color} />
+            </View>
           ),
         }}
       />
