@@ -138,7 +138,7 @@ export default function Onboarding() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#efdff1", // Light purple background
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
   },
   content: {
     flex: 1,
@@ -160,9 +160,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   imageCircle: {
-    width: width * 0.7,
-    height: width * 0.5,
-    borderRadius: (width * 0.7) / 2,
+    width: width * 0.9,
+    height: width * 1,
     backgroundColor: "rgba(255, 255, 255, 0.3)", // Semi-transparent white background
     justifyContent: "center",
     alignItems: "center",

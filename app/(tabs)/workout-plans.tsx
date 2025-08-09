@@ -1,4 +1,3 @@
-"use client";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -29,11 +28,17 @@ export default function WorkoutPlansScreen() {
 
   const [workouts, setWorkouts] = useState<UserWorkout[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"start" | "myPlans">("start");
+  const [startedWorkouts, setStartedWorkouts] = useState<Set<string>>(
+    new Set()
+  );
+  const [completedWorkouts, setCompletedWorkouts] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     if (user) {
       loadWorkouts();
+      // Load completed workouts from storage if needed
     }
   }, [user]);
 
@@ -44,6 +49,12 @@ export default function WorkoutPlansScreen() {
       setLoading(true);
       const userWorkouts = await firestoreService.getUserWorkouts(user.uid);
       setWorkouts(userWorkouts);
+
+      // Here you could load completed workouts from AsyncStorage or your database
+      // For example:
+      // const completed = await firestoreService.getCompletedWorkouts(user.uid);
+      // setCompletedWorkouts(new Set(completed));
+
       console.log("Loaded workouts:", userWorkouts.length);
     } catch (error) {
       console.error("Error loading workouts:", error);
@@ -74,6 +85,17 @@ export default function WorkoutPlansScreen() {
               setWorkouts((prevWorkouts) =>
                 prevWorkouts.filter((w) => w.id !== workoutId)
               );
+              // Remove from started and completed sets if present
+              setStartedWorkouts((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(workoutId);
+                return newSet;
+              });
+              setCompletedWorkouts((prev) => {
+                const newSet = new Set(prev);
+                newSet.delete(workoutId);
+                return newSet;
+              });
               console.log("Workout deleted successfully");
             } catch (error) {
               console.error("Error deleting workout:", error);
@@ -88,32 +110,81 @@ export default function WorkoutPlansScreen() {
     );
   };
 
-  const startWorkout = async (workout: UserWorkout) => {
+  const handleStartWorkout = async (workout: UserWorkout) => {
     if (!user) return;
 
+    // If workout is already completed, don't show start dialog
+    if (completedWorkouts.has(workout.id)) {
+      return;
+    }
+
+    Alert.alert("Start Workout", `Are you ready to start "${workout.name}"?`, [
+      {
+        text: "Cancel",
+        style: "cancel",
+        onPress: () => {
+          // Mark this workout as started (but not completed)
+          setStartedWorkouts((prev) => new Set(prev).add(workout.id));
+        },
+      },
+      {
+        text: "Start",
+        onPress: () => startWorkout(workout),
+      },
+    ]);
+  };
+
+  const startWorkout = async (workout: UserWorkout) => {
     try {
       console.log("Starting workout:", workout.name);
+      if (!user?.uid) {
+        Alert.alert("Error", "User not authenticated.");
+        return;
+      }
       const sessionId = await firestoreService.startWorkoutSession(
         user.uid,
         workout.id,
         workout
       );
-      router.push(`/workout-session/${sessionId}`);
+      router.push({
+        pathname: "/workout/[workoutId]",
+        params: {
+          workoutId: workout.id,
+          sessionId,
+        },
+      });
     } catch (error) {
       console.error("Error starting workout:", error);
       Alert.alert("Error", "Failed to start workout. Please try again.");
     }
   };
 
-  const handleAICoachRecommendation = () => {
-    router.push("/ai-chat");
+  const markWorkoutComplete = (workoutId: string) => {
+    setCompletedWorkouts((prev) => new Set(prev).add(workoutId));
+    // You might want to save this to AsyncStorage or your database here
+  };
+
+  const getButtonText = (workoutId: string) => {
+    if (completedWorkouts.has(workoutId)) {
+      return "Done";
+    } else if (startedWorkouts.has(workoutId)) {
+      return "Continue";
+    } else {
+      return "Start Plan";
+    }
+  };
+
+  const getButtonStyle = (workoutId: string) => {
+    if (completedWorkouts.has(workoutId)) {
+      return [styles.continueButton, styles.completedButton];
+    }
+    return styles.continueButton;
   };
 
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <Ionicons name="menu" size={24} color="#333" />
           <Text style={styles.headerTitle}>Workout Plans</Text>
           <View style={{ width: 24 }} />
         </View>
@@ -127,7 +198,6 @@ export default function WorkoutPlansScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Ionicons name="menu" size={24} color="#333" />
         <Text style={styles.headerTitle}>Workout Plans</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -139,204 +209,59 @@ export default function WorkoutPlansScreen() {
           paddingBottom: Platform.OS === "ios" ? 100 : 80,
         }}
       >
-        <LinearGradient
-          colors={["#F8E8FF", "#E8D5FF"]}
-          style={styles.aiCoachCard}
-        >
-          <View style={styles.aiCoachContent}>
-            <View style={styles.aiCoachText}>
-              <Text style={styles.aiCoachTitle}>AI Coach Recommendations</Text>
-              <Text style={styles.aiCoachDescription}>
-                Based on your fitness level and goals, the AI recommends this
-                plan is perfect for you. It combines strength and cardio for
-                optimal results.
-              </Text>
-              <TouchableOpacity
-                style={styles.aiCoachButton}
-                onPress={handleAICoachRecommendation}
-              >
-                <Text style={styles.aiCoachButtonText}>
-                  Start Recommended Plan
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.aiCoachIllustration}>
-              <View style={styles.personIllustration}>
-                <View style={styles.personHead} />
-                <View style={styles.personBody} />
-                <View style={styles.personArm} />
-                <View style={[styles.personArm, styles.personArmRight]} />
-                <View style={styles.personLeg} />
-                <View style={[styles.personLeg, styles.personLegRight]} />
-              </View>
-            </View>
-          </View>
-        </LinearGradient>
-
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "start" && styles.activeTab]}
-            onPress={() => setActiveTab("start")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "start" && styles.activeTabText,
-              ]}
-            >
-              Start
+        {workouts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="fitness-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyTitle}>No workout plans yet</Text>
+            <Text style={styles.emptyText}>
+              Add exercises to create your first workout plan!
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "myPlans" && styles.activeTab]}
-            onPress={() => setActiveTab("myPlans")}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "myPlans" && styles.activeTabText,
-              ]}
+            <TouchableOpacity
+              style={styles.browseButton}
+              onPress={() => router.push("/(tabs)/workout")}
             >
-              My Plans ({workouts.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === "start" ? (
-          <View>
-            <LinearGradient
-              colors={["#FF6B9D", "#C44CAE"]}
-              style={styles.featuredCard}
-            >
-              <View style={styles.featuredContent}>
-                <View style={styles.featuredText}>
-                  <Text style={styles.featuredTitle}>Balance Boost</Text>
-                  <Text style={styles.featuredDescription}>
-                    Gentle yoga, along with strength training
-                  </Text>
-                </View>
-
-                <View style={styles.featuredIllustration}>
-                  <View style={styles.yogaPersonContainer}>
-                    <View style={styles.yogaPerson}>
-                      <View style={styles.yogaHead} />
-                      <View style={styles.yogaBody} />
-                      <View style={styles.yogaArm} />
-                      <View style={[styles.yogaArm, styles.yogaArmRight]} />
-                      <View style={styles.yogaLeg} />
-                      <View style={[styles.yogaLeg, styles.yogaLegRight]} />
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>50</Text>
-                  <Text style={styles.statLabel}>days</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>35</Text>
-                  <Text style={styles.statLabel}>workouts</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>10,000</Text>
-                  <Text style={styles.statLabel}>points</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.startPlanButton}>
-                <Text style={styles.startPlanButtonText}>Start Plan</Text>
-              </TouchableOpacity>
-            </LinearGradient>
-
-            <LinearGradient
-              colors={["#FF6B9D", "#C44CAE"]}
-              style={styles.transformationCard}
-            >
-              <Text style={styles.transformationTitle}>
-                30 days Transformation
-              </Text>
-              <Text style={styles.transformationSubtitle}>
-                Complete body Transformation with
-              </Text>
-            </LinearGradient>
+              <Text style={styles.browseButtonText}>Browse Exercises</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <View>
-            {workouts.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="fitness-outline" size={64} color="#ccc" />
-                <Text style={styles.emptyTitle}>No workout plans yet</Text>
-                <Text style={styles.emptyText}>
-                  Add exercises to create your first workout plan!
-                </Text>
+          workouts.map((workout, index) => (
+            <LinearGradient
+              key={workout.id}
+              colors={
+                index % 2 === 0
+                  ? ["#FF6B9D", "#C44CAE"]
+                  : ["#6B73FF", "#4E54C8"]
+              }
+              style={styles.workoutCard}
+            >
+              <View style={styles.workoutHeader}>
+                <View style={styles.workoutInfo}>
+                  <Text style={styles.workoutName}>{workout.name}</Text>
+                  <Text style={styles.workoutDescription}>
+                    {`${workout.exercises.length} exercise${
+                      workout.exercises.length !== 1 ? "s" : ""
+                    } for ${workout.category}`}
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  style={styles.browseButton}
-                  onPress={() => router.push("/(tabs)/workout")}
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteWorkout(workout.id, workout.name)}
                 >
-                  <Text style={styles.browseButtonText}>Browse Exercises</Text>
+                  <Ionicons name="trash-outline" size={20} color="white" />
                 </TouchableOpacity>
               </View>
-            ) : (
-              workouts.map((workout, index) => (
-                <LinearGradient
-                  key={workout.id}
-                  colors={
-                    index % 2 === 0
-                      ? ["#FF6B9D", "#C44CAE"]
-                      : ["#6B73FF", "#4E54C8"]
-                  }
-                  style={styles.workoutCard}
-                >
-                  <View style={styles.workoutHeader}>
-                    <View style={styles.workoutInfo}>
-                      <Text style={styles.workoutName}>{workout.name}</Text>
-                      <Text style={styles.workoutDescription}>
-                        {`${workout.exercises.length} exercise${
-                          workout.exercises.length !== 1 ? "s" : ""
-                        } for ${workout.category}`}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() =>
-                        handleDeleteWorkout(workout.id, workout.name)
-                      }
-                    >
-                      <Ionicons name="trash-outline" size={20} color="white" />
-                    </TouchableOpacity>
-                  </View>
 
-                  <View style={styles.progressContainer}>
-                    <Text style={styles.progressText}>48% complete</Text>
-                    <View style={styles.progressBar}>
-                      <View style={[styles.progressFill, { width: "48%" }]} />
-                    </View>
-                  </View>
-
-                  <View style={styles.workoutStatsContainer}>
-                    <View style={styles.workoutStatItem}>
-                      <Text style={styles.workoutStatNumber}>30</Text>
-                      <Text style={styles.workoutStatLabel}>days</Text>
-                    </View>
-                    <View style={styles.workoutStatItem}>
-                      <Text style={styles.workoutStatNumber}>24</Text>
-                      <Text style={styles.workoutStatLabel}>workouts</Text>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.continueButton}
-                    onPress={() => startWorkout(workout)}
-                  >
-                    <Text style={styles.continueButtonText}>Continue</Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              ))
-            )}
-          </View>
+              <TouchableOpacity
+                style={getButtonStyle(workout.id)}
+                onPress={() => handleStartWorkout(workout)}
+                disabled={completedWorkouts.has(workout.id)}
+              >
+                <Text style={styles.continueButtonText}>
+                  {getButtonText(workout.id)}
+                </Text>
+              </TouchableOpacity>
+            </LinearGradient>
+          ))
         )}
       </ScrollView>
     </View>
@@ -371,6 +296,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+  },
+  completedButton: {
+    backgroundColor: "#4CAF50",
   },
   aiCoachCard: {
     borderRadius: 20,
@@ -408,202 +336,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 12,
     fontWeight: "600",
-  },
-  aiCoachIllustration: {
-    width: 80,
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  personIllustration: {
-    position: "relative",
-  },
-  personHead: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#FFB6C1",
-    marginBottom: 2,
-  },
-  personBody: {
-    width: 16,
-    height: 25,
-    backgroundColor: "#FF69B4",
-    borderRadius: 8,
-    marginBottom: 2,
-  },
-  personArm: {
-    position: "absolute",
-    width: 3,
-    height: 15,
-    backgroundColor: "#FFB6C1",
-    borderRadius: 2,
-    top: 22,
-    left: -5,
-    transform: [{ rotate: "-30deg" }],
-  },
-  personArmRight: {
-    left: 18,
-    transform: [{ rotate: "30deg" }],
-  },
-  personLeg: {
-    width: 4,
-    height: 20,
-    backgroundColor: "#333",
-    borderRadius: 2,
-    marginLeft: 2,
-  },
-  personLegRight: {
-    marginLeft: 10,
-    marginTop: -20,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#f0f0f0",
-    borderRadius: 25,
-    padding: 4,
-    marginBottom: 20,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 20,
-  },
-  activeTab: {
-    backgroundColor: "#333",
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#666",
-  },
-  activeTabText: {
-    color: "white",
-  },
-  featuredCard: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-  },
-  featuredContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  featuredText: {
-    flex: 1,
-  },
-  featuredTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 4,
-  },
-  featuredDescription: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.9)",
-  },
-  featuredIllustration: {
-    width: 80,
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  yogaPersonContainer: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 40,
-    width: 80,
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  yogaPerson: {
-    position: "relative",
-  },
-  yogaHead: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#FFB6C1",
-    marginBottom: 2,
-  },
-  yogaBody: {
-    width: 12,
-    height: 20,
-    backgroundColor: "white",
-    borderRadius: 6,
-    marginBottom: 2,
-  },
-  yogaArm: {
-    position: "absolute",
-    width: 2,
-    height: 12,
-    backgroundColor: "#FFB6C1",
-    borderRadius: 1,
-    top: 18,
-    left: -4,
-    transform: [{ rotate: "-45deg" }],
-  },
-  yogaArmRight: {
-    left: 14,
-    transform: [{ rotate: "45deg" }],
-  },
-  yogaLeg: {
-    width: 3,
-    height: 15,
-    backgroundColor: "#333",
-    borderRadius: 2,
-    marginLeft: 1,
-    transform: [{ rotate: "-20deg" }],
-  },
-  yogaLegRight: {
-    marginLeft: 8,
-    marginTop: -15,
-    transform: [{ rotate: "20deg" }],
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.8)",
-  },
-  startPlanButton: {
-    backgroundColor: "white",
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: "center",
-  },
-  startPlanButtonText: {
-    color: "#9512af",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  transformationCard: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-  },
-  transformationTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 4,
-  },
-  transformationSubtitle: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.9)",
   },
   emptyContainer: {
     alignItems: "center",

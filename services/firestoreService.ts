@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  arrayUnion as fbArrayUnion,
   getDoc,
   getDocs,
   increment,
@@ -12,6 +13,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -27,6 +29,11 @@ export interface Challenge {
   xpReward: number;
   isActive: boolean;
   createdAt: Date;
+}
+
+export interface AIChallenge extends Challenge {
+  isAI: boolean;
+  generatedAt: Date;
 }
 
 export interface UserChallenge {
@@ -96,6 +103,16 @@ export interface WorkoutSession {
   duration?: number;
 }
 
+export interface UserProfile {
+  fitnessLevel?: string;
+  goals?: string[];
+  equipment?: string[];
+  availableTime?: string;
+  completedChallenges?: string[];
+  preferredTypes?: string[];
+  experiencePoints?: number;
+}
+
 // Helper function to remove undefined values from objects
 function removeUndefined(obj: any): any {
   if (obj === null || obj === undefined) {
@@ -106,11 +123,16 @@ function removeUndefined(obj: any): any {
     return obj.map(removeUndefined).filter((item) => item !== undefined);
   }
 
-  if (typeof obj === "object") {
+  if (
+    typeof obj === "object" &&
+    !(obj instanceof Date) &&
+    !(obj instanceof Timestamp)
+  ) {
     const cleaned: any = {};
     for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        cleaned[key] = removeUndefined(value);
+      const cleanedValue = removeUndefined(value);
+      if (cleanedValue !== undefined) {
+        cleaned[key] = cleanedValue;
       }
     }
     return cleaned;
@@ -133,6 +155,156 @@ function safeToDate(timestamp: any): Date | undefined {
 }
 
 class FirestoreService {
+  // User Profile Methods
+  async getUserProfile(uid: string): Promise<UserProfile | null> {
+    try {
+      const userProfileRef = doc(db, "userProfiles", uid);
+      const docSnap = await getDoc(userProfileRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          fitnessLevel: data.fitnessLevel,
+          goals: data.goals || [],
+          equipment: data.equipment || [],
+          availableTime: data.availableTime,
+          completedChallenges: data.completedChallenges || [],
+          preferredTypes: data.preferredTypes || [],
+          experiencePoints: data.experiencePoints || 0,
+        } as UserProfile;
+      }
+
+      // Fallback to user document if profile doesn't exist
+      const userRef = doc(db, "users", uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        return {
+          fitnessLevel: data?.fitnessLevel,
+          goals: data?.goals || [],
+          equipment: data?.equipment || [],
+          availableTime: data?.availableTime,
+        } as UserProfile;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error getting user profile:", error);
+      return null;
+    }
+  }
+
+  async saveUserProfile(uid: string, profile: UserProfile): Promise<void> {
+    try {
+      const userProfileRef = doc(db, "userProfiles", uid);
+      await setDoc(userProfileRef, removeUndefined(profile), { merge: true });
+    } catch (error) {
+      console.error("Error saving user profile:", error);
+      throw error;
+    }
+  }
+
+  // AI Challenge Methods
+  async saveGeneratedChallenges(
+    userId: string,
+    challenges: AIChallenge[]
+  ): Promise<void> {
+    try {
+      const batch = writeBatch(db);
+      const timestamp = Timestamp.now();
+
+      challenges.forEach((challenge) => {
+        const challengeRef = doc(
+          collection(db, "users", userId, "generatedChallenges"),
+          challenge.id
+        );
+
+        batch.set(challengeRef, {
+          ...challenge,
+          generatedAt: timestamp,
+          isActive: true,
+          createdAt: timestamp,
+        });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error("Error saving generated challenges:", error);
+      throw error;
+    }
+  }
+
+  async getGeneratedChallenges(userId: string): Promise<AIChallenge[]> {
+    try {
+      const generatedRef = collection(
+        db,
+        "users",
+        userId,
+        "generatedChallenges"
+      );
+      const q = query(generatedRef, where("isActive", "==", true));
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        isAI: true,
+        createdAt: safeToDate(doc.data().createdAt) || new Date(),
+        generatedAt: safeToDate(doc.data().generatedAt) || new Date(),
+      })) as AIChallenge[];
+    } catch (error) {
+      console.error("Error getting generated challenges:", error);
+      return [];
+    }
+  }
+
+  async joinAIChallenge(userId: string, challengeId: string): Promise<void> {
+    try {
+      // Get the AI challenge details
+      const challengeRef = doc(
+        db,
+        "users",
+        userId,
+        "generatedChallenges",
+        challengeId
+      );
+      const challengeSnap = await getDoc(challengeRef);
+
+      if (!challengeSnap.exists()) {
+        throw new Error("AI Challenge not found");
+      }
+
+      const challengeData = challengeSnap.data();
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + (challengeData.duration || 30));
+
+      // Add to user challenges
+      const userChallengeRef = collection(db, "userChallenges");
+      await addDoc(
+        userChallengeRef,
+        removeUndefined({
+          userId,
+          challengeId,
+          challenge: {
+            ...challengeData,
+            id: challengeId,
+            isAI: true,
+          },
+          startDate,
+          endDate,
+          current: 0,
+          progress: 0,
+          completed: false,
+        })
+      );
+    } catch (error) {
+      console.error("Error joining AI challenge:", error);
+      throw error;
+    }
+  }
+
   // User Stats
   async initializeUserStats(userId: string): Promise<void> {
     const userStatsRef = doc(db, "userStats", userId);
@@ -353,7 +525,7 @@ class FirestoreService {
           },
           sets: exercise.sets || 3,
           reps: exercise.reps || 12,
-          duration: exercise.duration || null, // Always use null for optional numbers
+          duration: exercise.duration || null,
           restTime: exercise.restTime || 60,
         })),
         isCustom: workout.isCustom || false,
@@ -363,13 +535,10 @@ class FirestoreService {
       const workoutData = {
         ...cleanWorkout,
         userId,
-        createdAt: Timestamp.now(), // Use Firestore Timestamp
+        createdAt: Timestamp.now(),
       };
 
-      // Remove any undefined values before saving
       const cleanedData = removeUndefined(workoutData);
-      console.log("Saving workout data:", JSON.stringify(cleanedData, null, 2));
-
       const docRef = await addDoc(userWorkoutsRef, cleanedData);
       return docRef.id;
     } catch (error) {
@@ -417,29 +586,53 @@ class FirestoreService {
   async startWorkoutSession(
     userId: string,
     workoutId: string,
-    workout: UserWorkout
+    workoutData: UserWorkout
   ): Promise<string> {
     try {
-      const workoutSessionsRef = collection(db, "workoutSessions");
       const sessionData = {
         userId,
         workoutId,
-        workout,
+        workout: removeUndefined(workoutData),
         startTime: Timestamp.now(),
         completed: false,
       };
 
-      const cleanedData = removeUndefined(sessionData);
-      const docRef = await addDoc(workoutSessionsRef, cleanedData);
-
-      // Update workout last used
-      const workoutRef = doc(db, "userWorkouts", workoutId);
-      await updateDoc(workoutRef, { lastUsed: Timestamp.now() });
-
-      return docRef.id;
+      // Make sure this path matches your Firestore structure
+      const sessionRef = await addDoc(
+        collection(db, "workoutSessions"), // or `users/${userId}/workoutSessions`
+        sessionData
+      );
+      return sessionRef.id;
     } catch (error) {
       console.error("Error starting workout session:", error);
       throw error;
+    }
+  }
+
+  async getWorkoutSession(
+    sessionId: string,
+    userId: string
+  ): Promise<WorkoutSession | null> {
+    try {
+      // Adjust this path to match where you store sessions
+      const sessionRef = doc(db, "workoutSessions", sessionId);
+      // or doc(db, "users", userId, "workoutSessions", sessionId)
+
+      const docSnap = await getDoc(sessionRef);
+
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          startTime: safeToDate(data.startTime) || new Date(),
+          endTime: safeToDate(data.endTime),
+        } as WorkoutSession;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting workout session:", error);
+      return null;
     }
   }
 
@@ -516,6 +709,12 @@ class FirestoreService {
             updatedAt: Timestamp.now(),
           });
           await updateDoc(userStatsRef, xpUpdates);
+
+          // Add to completed challenges in profile
+          const userProfileRef = doc(db, "userProfiles", userId);
+          await updateDoc(userProfileRef, {
+            completedChallenges: fbArrayUnion(userChallenge.challengeId),
+          });
         }
 
         const cleanedUpdates = removeUndefined(updates);
@@ -523,6 +722,53 @@ class FirestoreService {
       }
     } catch (error) {
       console.error("Error updating challenge progress:", error);
+    }
+  }
+
+  // Workout Sessions Subscription
+  subscribeToWorkoutSessions(
+    userId: string,
+    callback: (sessions: WorkoutSession[]) => void
+  ) {
+    const workoutSessionsRef = collection(db, "workoutSessions");
+    const q = query(
+      workoutSessionsRef,
+      where("userId", "==", userId),
+      where("completed", "==", false)
+    );
+
+    return onSnapshot(q, (querySnapshot) => {
+      const sessions = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        startTime: safeToDate(doc.data().startTime) || new Date(),
+        endTime: safeToDate(doc.data().endTime),
+      })) as WorkoutSession[];
+
+      callback(sessions);
+    });
+  }
+
+  async getWorkoutSessions(userId: string): Promise<WorkoutSession[]> {
+    try {
+      // Update this path to match your actual Firestore structure
+      const workoutSessionsRef = collection(
+        db,
+        "users",
+        userId,
+        "workoutSessions"
+      );
+      const querySnapshot = await getDocs(workoutSessionsRef);
+
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        startTime: safeToDate(doc.data().startTime) || new Date(),
+        endTime: safeToDate(doc.data().endTime),
+      })) as WorkoutSession[];
+    } catch (error) {
+      console.error("Error getting workout sessions:", error);
+      return [];
     }
   }
 }

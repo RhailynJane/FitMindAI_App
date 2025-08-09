@@ -19,6 +19,8 @@ import {
   View,
 } from "react-native";
 import * as Yup from "yup";
+import { useAuthFunctions } from "../hooks/useAuthFunctions";
+import { auth } from "../lib/firebase";
 
 const { width } = Dimensions.get("window");
 
@@ -49,18 +51,35 @@ export default function ProfileSetup() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const router = useRouter();
+  const { updateUserProfile } = useAuthFunctions();
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString();
+  };
 
   const handleProfileSetup = async (values: ProfileSetupFormValues) => {
     try {
-      console.log("Profile data:", values);
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      // Prepare profile data
+      const profileData = {
+        gender: values.gender,
+        birthday: values.dateOfBirth,
+        weight: parseFloat(values.weight),
+        height: parseFloat(values.height),
+      };
+
+      // Update user profile in database
+      await updateUserProfile(user.uid, profileData);
+
+      console.log("Profile data saved:", profileData);
       router.push("/goal-selection");
     } catch (error: any) {
       Alert.alert("Profile Setup Failed", error.message);
     }
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString();
   };
 
   return (
@@ -74,7 +93,6 @@ export default function ProfileSetup() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top image */}
           <View style={styles.imageContainer}>
             <Image
               source={{ uri: "/placeholder.svg?height=200&width=200" }}
@@ -83,7 +101,6 @@ export default function ProfileSetup() {
             />
           </View>
 
-          {/* Heading */}
           <View style={styles.textContainer}>
             <Text style={styles.title}>Lets complete your profile</Text>
             <Text style={styles.subtitle}>
@@ -116,6 +133,7 @@ export default function ProfileSetup() {
                 <TouchableOpacity
                   style={styles.inputContainer}
                   onPress={() => setShowGenderPicker(!showGenderPicker)}
+                  activeOpacity={0.8}
                 >
                   <Ionicons
                     name="person-outline"
@@ -143,6 +161,7 @@ export default function ProfileSetup() {
                           setFieldValue("gender", option);
                           setShowGenderPicker(false);
                         }}
+                        activeOpacity={0.6}
                       >
                         <Text style={styles.pickerOptionText}>{option}</Text>
                       </TouchableOpacity>
@@ -154,6 +173,7 @@ export default function ProfileSetup() {
                 <TouchableOpacity
                   style={styles.inputContainer}
                   onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.8}
                 >
                   <Ionicons
                     name="calendar-outline"
@@ -202,6 +222,7 @@ export default function ProfileSetup() {
                   <TextInput
                     style={styles.input}
                     placeholder="Your Weight"
+                    placeholderTextColor="#999"
                     value={values.weight}
                     onChangeText={handleChange("weight")}
                     onBlur={handleBlur("weight")}
@@ -226,6 +247,7 @@ export default function ProfileSetup() {
                   <TextInput
                     style={styles.input}
                     placeholder="Your Height"
+                    placeholderTextColor="#999"
                     value={values.height}
                     onChangeText={handleChange("height")}
                     onBlur={handleBlur("height")}
@@ -271,40 +293,112 @@ export default function ProfileSetup() {
   );
 }
 
+// ... (keep your existing styles unchanged)
+
+// Stylesheet
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#efdff1" },
-  scrollContent: { paddingHorizontal: 30, paddingTop: 40, paddingBottom: 40 },
-  imageContainer: { alignItems: "center", marginBottom: 30 },
-  heroImage: { width: width * 0.6, height: width * 0.4 },
-  textContainer: { alignItems: "center", marginBottom: 40 },
-  title: { fontSize: 20, fontWeight: "bold", color: "#333", marginBottom: 8 },
-  subtitle: { fontSize: 14, color: "#666" },
-  form: { flex: 1 },
+  // Main container style
+  container: {
+    flex: 1,
+    backgroundColor: "#efdff1", // Light purple background
+  },
+
+  // ScrollView content container
+  scrollContent: {
+    paddingHorizontal: 30, // Horizontal padding
+    paddingTop: 40, // Top padding
+    paddingBottom: 40, // Bottom padding
+  },
+
+  // Image container
+  imageContainer: {
+    alignItems: "center", // Center horizontally
+    marginBottom: 30, // Space below image
+  },
+
+  // Profile image
+  heroImage: {
+    width: width * 0.6, // Responsive width (60% of screen)
+    height: width * 0.4, // Responsive height
+  },
+
+  // Text container
+  textContainer: {
+    alignItems: "center", // Center horizontally
+    marginBottom: 40, // Space below text
+  },
+
+  // Title text
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333", // Dark text
+    marginBottom: 8, // Space below title
+  },
+
+  // Subtitle text
+  subtitle: {
+    fontSize: 14,
+    color: "#666", // Gray text
+  },
+
+  // Form container
+  form: {
+    flex: 1, // Take up available space
+  },
+
+  // Input container
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f7f8f8",
+    flexDirection: "row", // Horizontal layout
+    alignItems: "center", // Center vertically
+    backgroundColor: "#f7f8f8", // Light gray background
     borderRadius: 14,
     paddingHorizontal: 15,
     marginBottom: 15,
     height: 60,
   },
-  inputIcon: { marginRight: 15 },
-  input: { flex: 1, fontSize: 16, color: "#333" },
-  placeholder: { color: "#999" },
+
+  // Input icon
+  inputIcon: {
+    marginRight: 15, // Space between icon and input
+  },
+
+  // Input field
+  input: {
+    flex: 1, // Take up remaining space
+    fontSize: 16,
+    color: "#333", // Dark text
+  },
+
+  // Placeholder text
+  placeholder: {
+    color: "#999", // Light gray text
+  },
+
+  // Unit container (KG/CM)
   unitContainer: {
-    backgroundColor: "#c58bf2",
+    backgroundColor: "#c58bf2", // Light purple background
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  unitText: { color: "white", fontSize: 12, fontWeight: "600" },
+
+  // Unit text
+  unitText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600", // Semi-bold
+  },
+
+  // Error text
   errorText: {
-    color: "#ff4444",
+    color: "#ff4444", // Red color
     fontSize: 12,
     marginBottom: 10,
     marginLeft: 15,
   },
+
+  // Picker container (gender options)
   pickerContainer: {
     backgroundColor: "white",
     borderRadius: 14,
@@ -313,20 +407,29 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 3, // Android shadow
   },
+
+  // Picker option (gender)
   pickerOption: {
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: "#f0f0f0", // Light gray border
   },
-  pickerOptionText: { fontSize: 16, color: "#333" },
+
+  // Picker option text
+  pickerOptionText: {
+    fontSize: 16,
+    color: "#333", // Dark text
+  },
+
+  // Next button
   nextButton: {
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Purple button
     borderRadius: 25,
     height: 60,
-    flexDirection: "row",
+    flexDirection: "row", // Horizontal layout
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
@@ -334,14 +437,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 5, // Android shadow
   },
-  disabledButton: { opacity: 0.7 },
+
+  // Disabled button state
+  disabledButton: {
+    opacity: 0.7, // Dim when disabled
+  },
+
+  // Next button text
   nextButtonText: {
     color: "white",
     fontSize: 16,
-    fontWeight: "600",
-    marginRight: 8,
+    fontWeight: "600", // Semi-bold
+    marginRight: 8, // Space between text and icon
   },
-  buttonIcon: { marginLeft: 4 },
+
+  // Button icon
+  buttonIcon: {
+    marginLeft: 4, // Space between text and icon
+  },
 });

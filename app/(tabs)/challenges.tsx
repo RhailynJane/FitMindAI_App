@@ -1,11 +1,13 @@
-// Import necessary components and hooks
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import OpenAI from "openai";
 import { useEffect, useState } from "react";
 import type { ColorValue } from "react-native";
 import {
+  ActivityIndicator,
   Alert,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,36 +15,34 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { v4 as uuidv4 } from "uuid";
 
 // Custom hooks and services
 import { useAuth } from "../../hooks/useAuth";
 import {
   firestoreService,
+  type AIChallenge,
   type Challenge,
   type UserChallenge,
 } from "../../services/firestoreService";
 
-// Main screen component
 export default function ChallengesScreen() {
-  // Get current authenticated user
   const { user } = useAuth();
-
-  // Safe area inset for layout adjustment
   const insets = useSafeAreaInsets();
 
-  // State to manage available and user-specific challenges
   const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>(
     []
   );
+  const [aiChallenges, setAiChallenges] = useState<AIChallenge[]>([]);
   const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
-  const [loading, setLoading] = useState(true); // Loading state for initial fetch
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [generatingAiChallenges, setGeneratingAiChallenges] = useState(false);
 
-  // Load challenges when component mounts
   useEffect(() => {
     loadChallenges();
   }, []);
 
-  // Subscribe to live updates of user challenges
   useEffect(() => {
     if (!user) return;
 
@@ -56,12 +56,18 @@ export default function ChallengesScreen() {
     return unsubscribe;
   }, [user]);
 
-  // Load all challenges and user's joined challenges
   const loadChallenges = async () => {
     try {
       setLoading(true);
-      const challenges = await firestoreService.getAvailableChallenges();
+      const [challenges, aiChallenges] = await Promise.all([
+        firestoreService.getAvailableChallenges(),
+        user
+          ? firestoreService.getGeneratedChallenges(user.uid)
+          : Promise.resolve([]),
+      ]);
+
       setAvailableChallenges(challenges);
+      setAiChallenges(aiChallenges);
 
       if (user) {
         const userChallenges = await firestoreService.getUserChallenges(
@@ -71,17 +77,22 @@ export default function ChallengesScreen() {
       }
     } catch (error) {
       console.error("Error loading challenges:", error);
+      Alert.alert("Error", "Failed to load challenges. Please try again.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Handle joining a challenge
-  const handleJoinChallenge = async (challengeId: string) => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadChallenges();
+  };
+
+  const handleJoinChallenge = async (challengeId: string, isAI = false) => {
     if (!user) return;
 
     try {
-      // Prevent user from joining an already joined (and not completed) challenge
       const alreadyJoined = userChallenges.some(
         (uc) => uc.challengeId === challengeId && !uc.completed
       );
@@ -94,8 +105,12 @@ export default function ChallengesScreen() {
         return;
       }
 
-      // Join the challenge and confirm success
-      await firestoreService.joinChallenge(user.uid, challengeId);
+      if (isAI) {
+        await firestoreService.joinAIChallenge(user.uid, challengeId);
+      } else {
+        await firestoreService.joinChallenge(user.uid, challengeId);
+      }
+
       Alert.alert("Success", "You have successfully joined the challenge!");
     } catch (error) {
       console.error("Error joining challenge:", error);
@@ -103,7 +118,114 @@ export default function ChallengesScreen() {
     }
   };
 
-  // Get gradient color based on challenge type
+  const generateAiChallenges = async () => {
+    if (!user) return;
+
+    try {
+      setGeneratingAiChallenges(true);
+
+      const profile = await firestoreService.getUserProfile(user.uid);
+      const stats = await firestoreService.getUserStats(user.uid);
+
+      const openai = new OpenAI({
+        apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
+        dangerouslyAllowBrowser: true,
+      });
+
+      const prompt = `Create 3 personalized fitness challenges in JSON format based on:
+      - Fitness Level: ${profile?.fitnessLevel || "Intermediate"}
+      - Goals: ${profile?.goals?.join(", ") || "General fitness"}
+      - Equipment: ${profile?.equipment?.join(", ") || "Bodyweight only"}
+      - Workouts Completed: ${stats?.totalWorkouts || 0}
+      - Preferences: ${profile?.preferredTypes?.join(", ") || "Mixed"}
+      
+      Each challenge should have:
+      - title: string
+      - description: string
+      - type: "consistency"|"strength"|"cardio"|"transformation"
+      - duration: number (7-30 days)
+      - target: number (workouts/days)
+      - reward: string
+      - xpReward: number (100-500)
+      
+      Return ONLY valid JSON like this:
+      {
+        "challenges": [
+          {
+            "title": "7-Day Cardio Blast",
+            "description": "Complete 5 cardio workouts in 7 days",
+            "type": "cardio",
+            "duration": 7,
+            "target": 5,
+            "reward": "Cardio Champion Badge",
+            "xpReward": 200
+          }
+        ]
+      }`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo-1106",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a fitness coach AI. Generate personalized workout challenges. Return ONLY valid JSON.",
+          },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      if (!responseContent) throw new Error("No response from AI");
+
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(responseContent);
+      } catch (e) {
+        throw new Error("Invalid JSON response from AI");
+      }
+
+      const challenges = parsedResponse.challenges || [];
+      if (!Array.isArray(challenges))
+        throw new Error("Invalid challenges format");
+
+      const aiChallenges: AIChallenge[] = challenges.map((challenge: any) => ({
+        id: `ai-${uuidv4()}`,
+        title: challenge.title || "Personalized Challenge",
+        description:
+          challenge.description ||
+          "Complete this challenge to improve your fitness",
+        type: ["consistency", "strength", "cardio", "transformation"].includes(
+          challenge.type
+        )
+          ? challenge.type
+          : "consistency",
+        duration: Math.min(Math.max(parseInt(challenge.duration) || 7, 7), 30),
+        target: Math.max(parseInt(challenge.target) || 5, 3),
+        reward: challenge.reward || "Achievement Badge",
+        xpReward: Math.min(
+          Math.max(parseInt(challenge.xpReward) || 200, 100),
+          500
+        ),
+        isActive: true,
+        isAI: true,
+        createdAt: new Date(),
+        generatedAt: new Date(),
+      }));
+
+      await firestoreService.saveGeneratedChallenges(user.uid, aiChallenges);
+      await loadChallenges();
+
+      Alert.alert("Success", "Your personalized challenges are ready!");
+    } catch (error) {
+      console.error("AI Challenge Generation Error:", error);
+      Alert.alert("Error", "Couldn't generate challenges. Please try again.");
+    } finally {
+      setGeneratingAiChallenges(false);
+    }
+  };
+
   const getChallengeColor = (type: string): [ColorValue, ColorValue] => {
     switch (type) {
       case "consistency":
@@ -112,26 +234,25 @@ export default function ChallengesScreen() {
         return ["#FF6B9D", "#FF8E9B"];
       case "cardio":
         return ["#45B7D1", "#96CEB4"];
+      case "transformation":
+        return ["#FFA751", "#FF7B54"];
       default:
         return ["#9512af", "#C58BF2"];
     }
   };
 
-  // Check if the user has joined the challenge
   const isUserJoined = (challengeId: string) => {
     return userChallenges.some(
       (uc) => uc.challengeId === challengeId && !uc.completed
     );
   };
 
-  // Get progress info for a specific challenge
   const getUserChallengeProgress = (challengeId: string) => {
     return userChallenges.find(
       (uc) => uc.challengeId === challengeId && !uc.completed
     );
   };
 
-  // Helper function to safely format dates
   const formatDate = (date: Date | string) => {
     try {
       const d = typeof date === "string" ? new Date(date) : date;
@@ -141,7 +262,6 @@ export default function ChallengesScreen() {
     }
   };
 
-  // Helper function to safely calculate days left
   const calculateDaysLeft = (endDate: Date | string) => {
     try {
       const end = typeof endDate === "string" ? new Date(endDate) : endDate;
@@ -154,7 +274,6 @@ export default function ChallengesScreen() {
     }
   };
 
-  // Show loading indicator while fetching data
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -162,6 +281,7 @@ export default function ChallengesScreen() {
           <Text style={styles.headerTitle}>Challenges</Text>
         </View>
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
           <Text>Loading challenges...</Text>
         </View>
       </View>
@@ -170,20 +290,37 @@ export default function ChallengesScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Challenges</Text>
       </View>
 
-      {/* Scrollable content */}
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: Platform.OS === "ios" ? 100 : 80,
         }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
       >
-        {/* Active Challenges Section */}
+        {user && (
+          <TouchableOpacity
+            style={styles.generateButton}
+            onPress={generateAiChallenges}
+            disabled={generatingAiChallenges}
+          >
+            {generatingAiChallenges ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.generateButtonText}>
+                Generate Personalized Challenges
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Active Challenges */}
         {userChallenges.filter(
           (uc) => !uc.completed && new Date() <= new Date(uc.endDate)
         ).length > 0 && (
@@ -194,67 +331,50 @@ export default function ChallengesScreen() {
                 (uc) => !uc.completed && new Date() <= new Date(uc.endDate)
               )
               .map((userChallenge) => (
-                <View key={userChallenge.id} style={styles.challengeCard}>
-                  <LinearGradient
-                    colors={getChallengeColor(userChallenge.challenge.type)}
-                    style={styles.challengeGradient}
-                  >
-                    {/* Header with title and progress */}
-                    <View style={styles.challengeHeader}>
-                      <View style={styles.challengeInfo}>
-                        <Text style={styles.challengeTitle}>
-                          {userChallenge.challenge.title}
-                        </Text>
-                        <Text style={styles.challengeDescription}>
-                          {userChallenge.challenge.description}
-                        </Text>
-                      </View>
-                      <Text style={styles.challengePercentage}>
-                        {Math.round(userChallenge.progress || 0)}%
-                      </Text>
-                    </View>
-
-                    {/* Progress bar */}
-                    <View style={styles.challengeProgress}>
-                      <Text style={styles.progressText}>
-                        Day {userChallenge.current || 0} of
-                        {userChallenge.challenge.target || 0}
-                      </Text>
-                      <View style={styles.progressBarContainer}>
-                        <View
-                          style={[
-                            styles.progressBar,
-                            {
-                              width: `${Math.min(
-                                100,
-                                userChallenge.progress || 0
-                              )}%`,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    {/* Footer with reward and time left */}
-                    <View style={styles.challengeFooter}>
-                      <Text style={styles.challengeReward}>
-                        Reward: {userChallenge.challenge.reward || "None"}
-                      </Text>
-                      <Text style={styles.challengeTimeLeft}>
-                        {calculateDaysLeft(userChallenge.endDate)} days left
-                      </Text>
-                    </View>
-                  </LinearGradient>
-                </View>
+                <ChallengeCard
+                  key={userChallenge.id}
+                  challenge={userChallenge.challenge}
+                  progress={userChallenge.progress}
+                  current={userChallenge.current}
+                  target={userChallenge.challenge.target}
+                  endDate={userChallenge.endDate}
+                  reward={userChallenge.challenge.reward}
+                  isAI={
+                    "isAI" in userChallenge.challenge
+                      ? (userChallenge.challenge as any).isAI
+                      : false
+                  }
+                />
               ))}
           </>
         )}
 
-        {/* Available Challenges Section */}
-        <Text style={styles.sectionTitle}>Available Challenges</Text>
+        {/* AI Challenges */}
+        {aiChallenges.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Personalized Challenges</Text>
+            {aiChallenges.map((challenge) => {
+              const userProgress = getUserChallengeProgress(challenge.id);
+              return (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  progress={userProgress?.progress}
+                  current={userProgress?.current}
+                  target={challenge.target}
+                  reward={challenge.reward}
+                  isAI={true}
+                  onJoin={() => handleJoinChallenge(challenge.id, true)}
+                  joined={isUserJoined(challenge.id)}
+                />
+              );
+            })}
+          </>
+        )}
 
+        {/* Available Challenges */}
+        <Text style={styles.sectionTitle}>Available Challenges</Text>
         {availableChallenges.length === 0 ? (
-          // No available challenges fallback UI
           <View style={styles.noChallengesContainer}>
             <Ionicons name="trophy-outline" size={48} color="#ccc" />
             <Text style={styles.noChallengesTitle}>
@@ -267,92 +387,22 @@ export default function ChallengesScreen() {
         ) : (
           availableChallenges.map((challenge) => {
             const userProgress = getUserChallengeProgress(challenge.id);
-            const joined = isUserJoined(challenge.id);
-
             return (
-              <View key={challenge.id} style={styles.challengeCard}>
-                <LinearGradient
-                  colors={getChallengeColor(challenge.type)}
-                  style={styles.challengeGradient}
-                >
-                  {/* Challenge header */}
-                  <View style={styles.challengeHeader}>
-                    <View style={styles.challengeInfo}>
-                      <Text style={styles.challengeTitle}>
-                        {challenge.title || "Untitled Challenge"}
-                      </Text>
-                      <Text style={styles.challengeDescription}>
-                        {challenge.description || "No description available"}
-                      </Text>
-                    </View>
-                    <View style={styles.challengeTypeContainer}>
-                      <Text style={styles.challengeType}>
-                        {challenge.type || "general"}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Challenge basic details */}
-                  <View style={styles.challengeDetails}>
-                    <Text style={styles.challengeDetailText}>
-                      Duration: {challenge.duration || 0} days
-                    </Text>
-                    <Text style={styles.challengeDetailText}>
-                      Target: {challenge.target || 0} workouts
-                    </Text>
-                    <Text style={styles.challengeDetailText}>
-                      Reward: {challenge.reward || "None"}
-                    </Text>
-                  </View>
-
-                  {/* Progress bar if user already joined */}
-                  {userProgress ? (
-                    <View style={styles.challengeProgress}>
-                      <Text style={styles.progressText}>
-                        Progress: {userProgress.current || 0} /
-                        {challenge.target || 0}
-                      </Text>
-                      <View style={styles.progressBarContainer}>
-                        <View
-                          style={[
-                            styles.progressBar,
-                            {
-                              width: `${Math.min(
-                                100,
-                                userProgress.progress || 0
-                              )}%`,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  ) : null}
-
-                  {/* Join button */}
-                  <TouchableOpacity
-                    style={[
-                      styles.challengeButton,
-                      joined && styles.challengeButtonJoined,
-                    ]}
-                    onPress={() => handleJoinChallenge(challenge.id)}
-                    disabled={joined}
-                  >
-                    <Text
-                      style={[
-                        styles.challengeButtonText,
-                        joined && styles.challengeButtonTextJoined,
-                      ]}
-                    >
-                      {joined ? "Joined" : "Join Challenge"}
-                    </Text>
-                  </TouchableOpacity>
-                </LinearGradient>
-              </View>
+              <ChallengeCard
+                key={challenge.id}
+                challenge={challenge}
+                progress={userProgress?.progress}
+                current={userProgress?.current}
+                target={challenge.target}
+                reward={challenge.reward}
+                onJoin={() => handleJoinChallenge(challenge.id)}
+                joined={isUserJoined(challenge.id)}
+              />
             );
           })
         )}
 
-        {/* Completed Challenges Section */}
+        {/* Completed Challenges */}
         {userChallenges.filter((uc) => uc.completed).length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Completed Challenges</Text>
@@ -368,8 +418,11 @@ export default function ChallengesScreen() {
                       <View style={styles.challengeInfo}>
                         <Text style={styles.challengeTitle}>
                           {userChallenge.challenge.title ||
-                            "Untitled Challenge"}
+                            "Untitled Challenge"}{" "}
                           ✓
+                          {"isAI" in userChallenge.challenge &&
+                            (userChallenge.challenge as any).isAI &&
+                            " (AI)"}
                         </Text>
                         <Text style={styles.challengeDescription}>
                           Completed on {formatDate(userChallenge.endDate)}
@@ -390,21 +443,158 @@ export default function ChallengesScreen() {
   );
 }
 
+const ChallengeCard = ({
+  challenge,
+  progress = 0,
+  current = 0,
+  target = 0,
+  endDate,
+  reward = "None",
+  isAI = false,
+  onJoin,
+  joined = false,
+}: {
+  challenge: Challenge | AIChallenge;
+  progress?: number;
+  current?: number;
+  target?: number;
+  endDate?: Date | string;
+  reward?: string;
+  isAI?: boolean;
+  onJoin?: () => void;
+  joined?: boolean;
+}) => {
+  const getChallengeColor = (type: string): [ColorValue, ColorValue] => {
+    switch (type) {
+      case "consistency":
+        return ["#4ECDC4", "#44A08D"];
+      case "strength":
+        return ["#FF6B9D", "#FF8E9B"];
+      case "cardio":
+        return ["#45B7D1", "#96CEB4"];
+      case "transformation":
+        return ["#FFA751", "#FF7B54"];
+      default:
+        return ["#9512af", "#C58BF2"];
+    }
+  };
+
+  const calculateDaysLeft = (endDate: Date | string | undefined) => {
+    if (!endDate) return 0;
+    try {
+      const end = typeof endDate === "string" ? new Date(endDate) : endDate;
+      const now = new Date();
+      const diffTime = end.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  return (
+    <View style={styles.challengeCard}>
+      <LinearGradient
+        colors={getChallengeColor(challenge.type)}
+        style={styles.challengeGradient}
+      >
+        <View style={styles.challengeHeader}>
+          <View style={styles.challengeInfo}>
+            <Text style={styles.challengeTitle}>
+              {challenge.title}
+              {isAI && " (AI)"}
+            </Text>
+            <Text style={styles.challengeDescription}>
+              {challenge.description}
+            </Text>
+          </View>
+          {progress ? (
+            <Text style={styles.challengePercentage}>
+              {Math.round(progress)}%
+            </Text>
+          ) : (
+            <View style={styles.challengeTypeContainer}>
+              <Text style={styles.challengeType}>{challenge.type}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.challengeDetails}>
+          <Text style={styles.challengeDetailText}>
+            Duration: {challenge.duration} days
+          </Text>
+          <Text style={styles.challengeDetailText}>
+            Target: {target} workouts
+          </Text>
+          <Text style={styles.challengeDetailText}>Reward: {reward}</Text>
+        </View>
+
+        {progress ? (
+          <View style={styles.challengeProgress}>
+            <Text style={styles.progressText}>
+              Day {current} of {target}
+            </Text>
+            <View style={styles.progressBarContainer}>
+              <View
+                style={[
+                  styles.progressBar,
+                  { width: `${Math.min(100, progress)}%` },
+                ]}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {endDate && (
+          <View style={styles.challengeFooter}>
+            <Text style={styles.challengeReward}>Reward: {reward}</Text>
+            <Text style={styles.challengeTimeLeft}>
+              {calculateDaysLeft(endDate)} days left
+            </Text>
+          </View>
+        )}
+
+        {onJoin && (
+          <TouchableOpacity
+            style={[
+              styles.challengeButton,
+              joined && styles.challengeButtonJoined,
+            ]}
+            onPress={onJoin}
+            disabled={joined}
+          >
+            <Text
+              style={[
+                styles.challengeButtonText,
+                joined && styles.challengeButtonTextJoined,
+              ]}
+            >
+              {joined ? "Joined" : "Join Challenge"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
   header: {
-    backgroundColor: "white",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    backgroundColor: "white",
+    marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "600",
     color: "#333",
   },
   loadingContainer: {
@@ -542,5 +732,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
     textAlign: "center",
+  },
+  generateButton: {
+    backgroundColor: "#6e3b6e",
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  generateButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
