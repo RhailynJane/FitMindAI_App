@@ -25,7 +25,7 @@ export default function Index() {
     // Show loading spinner while auth status is being determined
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#9512af" /> {/* Spinner */}
+        <ActivityIndicator size="large" color="#9512af" />
       </View>
     );
   }
