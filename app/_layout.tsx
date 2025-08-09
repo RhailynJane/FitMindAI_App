@@ -1,21 +1,46 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import React from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import ErrorBoundary from "../components/ErrorBoundary";
+import { AuthProvider } from "../hooks/useAuth";
 
 export default function RootLayout() {
   return (
-    <>
-      <StatusBar style="dark" backgroundColor="#efdff1" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="welcome" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="signup" options={{ headerShown: false }} />
-        <Stack.Screen name="profile-setup" options={{ headerShown: false }} />
-        <Stack.Screen name="goal-selection" options={{ headerShown: false }} />
-        <Stack.Screen name="signin" options={{ headerShown: false }} />
-        <Stack.Screen name="welcome-success" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-    </>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <StatusBar style="dark" />
+        <ErrorBoundary>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#f8f9fa" },
+            }}
+          >
+            {/* Auth Screens */}
+            <Stack.Screen name="index" />
+            <Stack.Screen name="welcome" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="signup" />
+            <Stack.Screen name="signin" />
+            <Stack.Screen name="profile-setup" />
+            <Stack.Screen name="goal-selection" />
+            <Stack.Screen name="welcome-success" />
+
+            {/* Main App Screens */}
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="ai-chat" />
+
+            {/* Exercise Screens */}
+            <Stack.Screen name="exercises/[bodyPart]" />
+            <Stack.Screen name="exercise-details/[id]" />
+
+            {/* Workout Screens */}
+            <Stack.Screen name="workout/[workoutId]" />
+            <Stack.Screen name="workout-complete" />
+          </Stack>
+        </ErrorBoundary>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
