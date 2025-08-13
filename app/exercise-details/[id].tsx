@@ -764,6 +764,7 @@ const styles = StyleSheet.create({
   // Form input group container
   inputGroup: {
     marginBottom: 16,
+    flex: 1,
   },
 
   // Input field label
@@ -787,11 +788,13 @@ const styles = StyleSheet.create({
   // Horizontal container for paired inputs
   inputRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     gap: 12, // Space between paired inputs
   },
 
   // Numeric input with center alignment
   numberInput: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
