@@ -34,60 +34,63 @@ export default function WorkoutCompleteScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log("Params:", params);
-    console.log("User:", user);
+    let isMounted = true;
 
     const loadWorkoutSession = async () => {
-      if (!params.sessionId || !user?.uid) {
-        setError("Missing session ID or user");
-        return;
-      }
-
       try {
-        setIsLoading(true);
+        if (!params.sessionId || !user?.uid) {
+          if (isMounted) setError("Missing session ID or user");
+          return;
+        }
 
-        // Add debug log
-        console.log("Attempting to fetch session:", params.sessionId);
+        if (isMounted) setIsLoading(true);
 
-        // Use the new getWorkoutSession method
-        const sessionId =
-          typeof params.sessionId === "string"
-            ? params.sessionId
-            : params.sessionId?.[0];
+        const sessionId = 
+          typeof params.sessionId === "string" 
+            ? params.sessionId 
+            : params.sessionId?.[0] || "";
+
         const session = await firestoreService.getWorkoutSession(
           sessionId,
           user.uid
         );
 
+        if (!isMounted) return;
+
         if (!session) {
-          console.error("Session not found in Firestore");
           setError("Workout session not found");
           return;
         }
 
-        // Calculate duration
         const now = new Date();
         const startTime = session.startTime;
-        const durationMinutes =
-          (now.getTime() - startTime.getTime()) / (1000 * 60);
+        const durationMinutes = (now.getTime() - startTime.getTime()) / (1000 * 60);
 
-        setStats({
-          duration: durationMinutes,
-          calories: Math.round(durationMinutes * 10),
-          exercises: session.workout?.exercises?.length || 0,
-          workoutName: session.workout?.name || "Workout",
-          workoutCategory: session.workout?.category || "General",
-          startTime,
-        });
+        if (isMounted) {
+          setStats({
+            duration: durationMinutes,
+            calories: Math.round(durationMinutes * 10),
+            exercises: session.workout?.exercises?.length || 0,
+            workoutName: session.workout?.name || "Custom Workout",
+            workoutCategory: session.workout?.category || "General",
+            startTime,
+          });
+        }
       } catch (error) {
-        console.error("Error loading workout session:", error);
-        setError("Failed to load workout details");
+        if (isMounted) {
+          console.error("Error loading workout session:", error);
+          setError("Failed to load workout details");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     loadWorkoutSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, [params.sessionId, user?.uid]);
 
   const completeWorkoutSession = async () => {
@@ -95,21 +98,22 @@ export default function WorkoutCompleteScreen() {
 
     try {
       setIsLoading(true);
+      const sessionId = 
+        typeof params.sessionId === "string" 
+          ? params.sessionId 
+          : params.sessionId?.[0] || "";
+      
       await firestoreService.completeWorkoutSession(
-        typeof params.sessionId === "string"
-          ? params.sessionId
-          : params.sessionId[0],
-        stats.duration
+        sessionId,
+        stats.duration,
+        user.uid
       );
       setIsSaved(true);
-
-      // Optional: Show success message
-      Alert.alert("Success", "Workout saved successfully!");
     } catch (error) {
       console.error("Error completing workout session:", error);
       Alert.alert(
-        "Error",
-        "Failed to save workout completion. Your stats are still recorded locally."
+        "Error", 
+        "Failed to save workout. Your stats are still recorded locally."
       );
     } finally {
       setIsLoading(false);
@@ -142,22 +146,37 @@ export default function WorkoutCompleteScreen() {
     }
   };
 
-  if (!stats) {
+  const handleDone = async () => {
+    if (!isSaved) {
+      await completeWorkoutSession();
+    }
+    router.replace({
+      pathname: "/(tabs)/dashboard",
+      params: { refresh: new Date().getTime() },
+    });
+  };
+
+  if (error || !stats) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9512af" />
-          <Text style={styles.loadingText}>
-            {error || "Loading your workout results..."}
-          </Text>
-          {error && (
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => router.push("/(tabs)/dashboard")}
-            >
-              <Text style={styles.retryButtonText}>Return to Dashboard</Text>
-            </TouchableOpacity>
+          {error ? (
+            <>
+              <Ionicons name="warning-outline" size={48} color="#ff4444" />
+              <Text style={styles.errorText}>{error}</Text>
+            </>
+          ) : (
+            <ActivityIndicator size="large" color="#9512af" />
           )}
+          <Text style={styles.loadingText}>
+            {error ? "Couldn't load workout" : "Loading your results..."}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => router.replace("/(tabs)/dashboard")}
+          >
+            <Text style={styles.retryButtonText}>Return to Dashboard</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -167,8 +186,15 @@ export default function WorkoutCompleteScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/dashboard")}>
-            <Ionicons name="close" size={24} color="#333" />
+          <TouchableOpacity 
+            onPress={handleDone}
+            disabled={isLoading}
+          >
+            <Ionicons 
+              name="close" 
+              size={24} 
+              color={isLoading ? "#ccc" : "#333"} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -177,7 +203,7 @@ export default function WorkoutCompleteScreen() {
             <Ionicons
               name={isSaved ? "checkmark-circle" : "timer-outline"}
               size={80}
-              color={isSaved ? "#9512af" : "#666"}
+              color={isSaved ? "#4CAF50" : "#9512af"}
             />
             {isLoading && (
               <ActivityIndicator
@@ -191,19 +217,19 @@ export default function WorkoutCompleteScreen() {
             {isLoading ? "Saving..." : "Workout Completed!"}
           </Text>
           <Text style={styles.completedSubtitle}>
-            {stats.workoutName} ({stats.workoutCategory})
+            {stats.workoutName} • {stats.workoutCategory}
           </Text>
           {stats.startTime && (
             <Text style={styles.timeText}>
-              {stats.startTime.toLocaleTimeString()} •{" "}
-              {stats.startTime.toLocaleDateString()}
+              {stats.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{" "}
+              {stats.startTime.toLocaleDateString([], { month: 'short', day: 'numeric' })}
             </Text>
           )}
         </View>
 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={24} color="#9512af" />
+            <Ionicons name="time-outline" size={28} color="#9512af" />
             <Text style={styles.statValue}>
               {formatDuration(stats.duration)}
             </Text>
@@ -211,46 +237,53 @@ export default function WorkoutCompleteScreen() {
           </View>
 
           <View style={styles.statItem}>
-            <Ionicons name="flame-outline" size={24} color="#9512af" />
+            <Ionicons name="flame-outline" size={28} color="#9512af" />
             <Text style={styles.statValue}>{stats.calories}</Text>
             <Text style={styles.statLabel}>Calories</Text>
           </View>
 
           <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={24} color="#9512af" />
+            <Ionicons name="barbell-outline" size={28} color="#9512af" />
             <Text style={styles.statValue}>{stats.exercises}</Text>
             <Text style={styles.statLabel}>Exercises</Text>
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={handleShare}
-          disabled={isLoading}
-        >
-          <Ionicons
-            name="share-social-outline"
-            size={20}
-            color="white"
-            style={styles.buttonIcon}
-          />
-          <Text style={styles.shareButtonText}>Share Results</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.shareButton,
+              isLoading && styles.disabledButton
+            ]}
+            onPress={handleShare}
+            disabled={isLoading}
+          >
+            <Ionicons
+              name="share-social-outline"
+              size={20}
+              color="white"
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.shareButtonText}>Share Results</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.doneButton, isLoading && styles.disabledButton]}
-          onPress={async () => {
-            await completeWorkoutSession();
-            router.push("/(tabs)/dashboard");
-          }}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#9512af" />
-          ) : (
-            <Text style={styles.doneButtonText}>Done</Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.doneButton,
+              isLoading && styles.disabledButton
+            ]}
+            onPress={handleDone}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#9512af" />
+            ) : (
+              <Text style={styles.doneButtonText}>
+                {isSaved ? "Return Home" : "Save & Finish"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -259,79 +292,89 @@ export default function WorkoutCompleteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#efdff1",
+    backgroundColor: "#f8f1f9",
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 16,
   },
   header: {
     alignItems: "flex-end",
+    marginBottom: 10,
   },
   completedContainer: {
     alignItems: "center",
-    marginTop: 60,
-    marginBottom: 60,
+    marginVertical: 30,
   },
   completedIconContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
     position: "relative",
   },
   loadingIndicator: {
     position: "absolute",
-    alignSelf: "center",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
   },
   completedTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#2d2d2d",
+    marginBottom: 6,
     textAlign: "center",
   },
   completedSubtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: 18,
+    color: "#555",
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 6,
+    fontWeight: "500",
   },
   timeText: {
     fontSize: 14,
-    color: "#999",
+    color: "#888",
     textAlign: "center",
   },
   statsContainer: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 60,
+    justifyContent: "space-between",
+    marginVertical: 30,
+    paddingHorizontal: 20,
   },
   statItem: {
     alignItems: "center",
-    minWidth: 80,
+    minWidth: 100,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-    marginTop: 8,
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#2d2d2d",
+    marginVertical: 6,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#666",
+    fontWeight: "500",
+  },
+  buttonContainer: {
+    marginTop: 20,
   },
   shareButton: {
     backgroundColor: "#9512af",
     borderRadius: 25,
-    height: 56,
+    height: 50,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
-    opacity: 1,
+    marginBottom: 15,
+    elevation: 3,
   },
   buttonIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   shareButtonText: {
     color: "white",
@@ -339,13 +382,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   doneButton: {
-    backgroundColor: "transparent",
+    backgroundColor: "white",
     borderWidth: 2,
     borderColor: "#9512af",
     borderRadius: 25,
-    height: 56,
+    height: 50,
     alignItems: "center",
     justifyContent: "center",
+    elevation: 2,
   },
   disabledButton: {
     opacity: 0.6,
@@ -359,19 +403,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 30,
+  },
+  errorText: {
+    color: "#ff4444",
+    fontSize: 18,
+    fontWeight: "600",
+    marginVertical: 10,
+    textAlign: "center",
   },
   loadingText: {
-    marginTop: 16,
+    fontSize: 16,
     color: "#666",
+    marginVertical: 10,
+    textAlign: "center",
   },
   retryButton: {
     marginTop: 20,
-    padding: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
     backgroundColor: "#9512af",
-    borderRadius: 5,
+    borderRadius: 25,
+    elevation: 2,
   },
   retryButtonText: {
     color: "white",
-    textAlign: "center",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

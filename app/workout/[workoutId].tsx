@@ -1,4 +1,4 @@
-"use client";
+// app/workout/[workoutId].tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -33,97 +33,130 @@ export default function WorkoutSessionScreen() {
   const [exerciseTime, setExerciseTime] = useState(30);
   const [gifUrl, setGifUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isSkipped, setIsSkipped] = useState(false);
+  const [hasCompleted, setHasCompleted] = useState(false);
 
+  // Load workout data
   useEffect(() => {
-    loadWorkout();
+    const loadWorkoutData = async () => {
+      try {
+        const sampleWorkout = await workoutGenerator.generateWorkout({
+          duration: 20,
+          difficulty: "Beginner",
+          bodyParts: ["chest", "upper legs"],
+          equipment: ["body weight"],
+          fitnessGoal: "weight_loss",
+        });
+        
+        setWorkout(sampleWorkout);
+        if (sampleWorkout?.exercises.length > 0) {
+          loadExerciseGif(sampleWorkout.exercises[0].exercise.id);
+        }
+      } catch (error) {
+        console.error("Error loading workout:", error);
+        Alert.alert("Error", "Failed to load workout");
+      }
+    };
+
+    loadWorkoutData();
   }, [id]);
 
+  // Workout timer logic
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
 
-    if (isStarted && !isPaused && workout) {
+    if (isStarted && !isPaused && !hasCompleted && workout) {
       if (countdown > 0) {
         timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       } else if (exerciseTime > 0) {
         timer = setTimeout(() => setExerciseTime(exerciseTime - 1), 1000);
       } else {
-        const currentWorkoutExercise = workout.exercises[currentExercise];
-
-        if (currentSet < currentWorkoutExercise.sets) {
-          setCurrentSet(currentSet + 1);
-          setExerciseTime(currentWorkoutExercise.duration || 30);
-          setCountdown(3);
-        } else if (currentExercise < workout.exercises.length - 1) {
-          setCurrentExercise(currentExercise + 1);
-          setCurrentSet(1);
-          const nextExercise = workout.exercises[currentExercise + 1];
-          setExerciseTime(nextExercise.duration || 30);
-          setCountdown(3);
-          loadExerciseGif(nextExercise.exercise.id);
-        } else {
-          // Complete the workout session
-          if (sessionId && user?.uid) {
-            firestoreService
-              .completeWorkoutSession(sessionId, calculateTotalDuration())
-              .then(() => {
-                router.push({
-                  pathname: "/workout-complete",
-                  params: { sessionId },
-                });
-              })
-              .catch((error) => {
-                console.error("Error completing session:", error);
-                router.push("/workout-complete");
-              });
-          } else {
-            router.push("/workout-complete");
-          }
-        }
+        handleExerciseCompletion();
       }
     }
 
     return () => clearTimeout(timer);
-  }, [
-    isStarted,
-    isPaused,
-    countdown,
-    exerciseTime,
-    currentExercise,
-    currentSet,
-    workout,
-  ]);
+  }, [isStarted, isPaused, countdown, exerciseTime, currentExercise, currentSet, workout, hasCompleted]);
 
-  const calculateTotalDuration = () => {
-    if (!workout) return 0;
-    let totalSeconds = 0;
+  const handleExerciseCompletion = () => {
+    if (!workout || hasCompleted) return;
 
-    workout.exercises.forEach((exercise) => {
-      const exerciseDuration = exercise.duration || 30;
-      totalSeconds += exerciseDuration * exercise.sets;
-      // Add countdown time between sets
-      totalSeconds += 3 * (exercise.sets - 1);
-    });
+    const currentWorkoutExercise = workout.exercises[currentExercise];
 
-    return Math.round(totalSeconds / 60); // Return duration in minutes
+    if (currentSet < currentWorkoutExercise.sets) {
+      // Next set
+      setCurrentSet(currentSet + 1);
+      setExerciseTime(currentWorkoutExercise.duration || 30);
+      setCountdown(3);
+    } else if (currentExercise < workout.exercises.length - 1) {
+      // Next exercise
+      setCurrentExercise(currentExercise + 1);
+      setCurrentSet(1);
+      const nextExercise = workout.exercises[currentExercise + 1];
+      setExerciseTime(nextExercise.duration || 30);
+      setCountdown(3);
+      loadExerciseGif(nextExercise.exercise.id);
+    } else {
+      // Workout complete
+      setHasCompleted(true);
+      completeWorkoutSession();
+    }
   };
 
-  const loadWorkout = async () => {
-    try {
-      const sampleWorkout = await workoutGenerator.generateWorkout({
-        duration: 20,
-        difficulty: "Beginner",
-        bodyParts: ["chest", "upper legs"],
-        equipment: ["body weight"],
-        fitnessGoal: "weight_loss",
-      });
-      setWorkout(sampleWorkout);
-      if (sampleWorkout?.exercises.length > 0) {
-        loadExerciseGif(sampleWorkout.exercises[0].exercise.id);
-      }
-    } catch (error) {
-      console.error("Error loading workout:", error);
-      Alert.alert("Error", "Failed to load workout");
+  const completeWorkoutSession = async () => {
+    if (!sessionId || !user?.uid || !workout) {
+      router.replace("/workout-complete");
+      return;
     }
+
+    try {
+      const duration = calculateTotalDuration();
+      const completedExercises = isSkipped 
+        ? currentExercise + 1 
+        : workout.exercises.length;
+
+      await firestoreService.completeWorkoutSession(
+        sessionId,
+        duration,
+        user.uid
+      );
+
+      router.replace({
+        pathname: "/workout-complete",
+        params: { 
+          sessionId,
+          isSkipped: String(isSkipped),
+          completedExercises: String(completedExercises)
+        },
+      });
+    } catch (error) {
+      console.error("Error completing session:", error);
+      router.replace("/workout-complete");
+    }
+  };
+
+  const calculateTotalDuration = () => {
+    if (!workout) return 1; // Minimum 1 minute
+    
+    if (isSkipped) {
+      // Approximate 2 minutes per completed exercise for skipped workouts
+      return Math.max(1, (currentExercise + 1) * 2);
+    }
+
+    // Calculate actual duration for completed workouts
+    let totalSeconds = 0;
+    workout.exercises.forEach((exercise, index) => {
+      if (index <= currentExercise) {
+        const setsToCount = index < currentExercise 
+          ? exercise.sets 
+          : currentSet;
+        
+        totalSeconds += (exercise.duration || 30) * setsToCount;
+        totalSeconds += 3 * (setsToCount - 1); // Countdown between sets
+      }
+    });
+    
+    return Math.max(1, Math.round(totalSeconds / 60));
   };
 
   const loadExerciseGif = async (exerciseId: string) => {
@@ -136,7 +169,7 @@ export default function WorkoutSessionScreen() {
         const exercise = workout.exercises.find(
           (ex) => ex.exercise.id === exerciseId
         );
-        if (exercise) {
+        if (exercise?.exercise.gifUrl) {
           setGifUrl(exercise.exercise.gifUrl);
         }
       }
@@ -150,7 +183,6 @@ export default function WorkoutSessionScreen() {
     }
 
     try {
-      // Prepare the workout data with all required fields
       const workoutData: UserWorkout = {
         id: id || `custom-${Date.now()}`,
         userId: user.uid,
@@ -165,22 +197,20 @@ export default function WorkoutSessionScreen() {
             gifUrl: ex.exercise.gifUrl || "",
             instructions: ex.exercise.instructions || [],
             secondaryMuscles: ex.exercise.secondaryMuscles || [],
-            difficulty: ex.exercise.difficulty || "intermediate",
+            difficulty: ex.exercise.difficulty || "Beginner",
             category: ex.exercise.category || "general",
             description: ex.exercise.description || "",
           },
           sets: ex.sets || 3,
           reps: ex.reps || 12,
           duration: ex.duration || null,
-          restTime: ex.restTime || 60,
+          restTime: ex.restTime ?? 30, // Provide a default restTime if missing
         })),
         isCustom: true,
         category: workout.category || "general",
         createdAt: new Date(),
-        // Don't include lastUsed unless you have a value
       };
 
-      // Start the session
       const sessionId = await firestoreService.startWorkoutSession(
         user.uid,
         workoutData.id,
@@ -189,8 +219,9 @@ export default function WorkoutSessionScreen() {
 
       setSessionId(sessionId);
       setIsStarted(true);
+      setIsSkipped(false);
+      setHasCompleted(false);
 
-      // Load first exercise GIF
       if (workout.exercises.length > 0) {
         loadExerciseGif(workout.exercises[0].exercise.id);
       }
@@ -199,13 +230,16 @@ export default function WorkoutSessionScreen() {
       Alert.alert("Error", "Failed to start workout session");
     }
   };
+
   const togglePause = () => {
     setIsPaused(!isPaused);
   };
 
   const skipExercise = () => {
-    if (!workout) return;
-
+    if (!workout || hasCompleted) return;
+    
+    setIsSkipped(true);
+    
     if (currentExercise < workout.exercises.length - 1) {
       setCurrentExercise(currentExercise + 1);
       setCurrentSet(1);
@@ -214,22 +248,8 @@ export default function WorkoutSessionScreen() {
       setCountdown(3);
       loadExerciseGif(nextExercise.exercise.id);
     } else {
-      if (sessionId && user?.uid) {
-        firestoreService
-          .completeWorkoutSession(sessionId, calculateTotalDuration())
-          .then(() => {
-            router.push({
-              pathname: "/workout-complete",
-              params: { sessionId },
-            });
-          })
-          .catch((error) => {
-            console.error("Error completing session:", error);
-            router.push("/workout-complete");
-          });
-      } else {
-        router.push("/workout-complete");
-      }
+      setHasCompleted(true);
+      completeWorkoutSession();
     }
   };
 
@@ -280,7 +300,10 @@ export default function WorkoutSessionScreen() {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.startButton} onPress={startWorkout}>
+          <TouchableOpacity 
+            style={styles.startButton} 
+            onPress={startWorkout}
+          >
             <Text style={styles.startButtonText}>Start Workout</Text>
           </TouchableOpacity>
         </View>
@@ -316,12 +339,11 @@ export default function WorkoutSessionScreen() {
       </View>
 
       <View style={styles.workoutContainer}>
-        {gifUrl || currentExerciseData.gifUrl ? (
+        {gifUrl ? (
           <Image
-            source={{ uri: gifUrl || currentExerciseData.gifUrl }}
+            source={{ uri: gifUrl }}
             style={styles.exerciseImage}
             resizeMode="contain"
-            onError={() => console.log("Failed to load exercise image")}
           />
         ) : (
           <View style={styles.placeholderImage}>
@@ -359,7 +381,10 @@ export default function WorkoutSessionScreen() {
         </View>
 
         <View style={styles.controlsContainer}>
-          <TouchableOpacity style={styles.controlButton} onPress={togglePause}>
+          <TouchableOpacity 
+            style={styles.controlButton} 
+            onPress={togglePause}
+          >
             <Ionicons
               name={isPaused ? "play" : "pause"}
               size={24}
@@ -367,7 +392,10 @@ export default function WorkoutSessionScreen() {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.skipButton} onPress={skipExercise}>
+          <TouchableOpacity 
+            style={styles.skipButton} 
+            onPress={skipExercise}
+          >
             <Ionicons name="play-skip-forward" size={24} color="#9512af" />
           </TouchableOpacity>
         </View>
