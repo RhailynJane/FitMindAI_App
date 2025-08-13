@@ -25,14 +25,6 @@ import {
 
 const { width } = Dimensions.get("window");
 
-interface QuickWorkout {
-  id: string;
-  title: string;
-  duration: string;
-  level: string;
-  color: string;
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   const { logout, getUserProfile } = useAuthFunctions();
@@ -96,40 +88,12 @@ export default function Dashboard() {
     };
   }, [user]);
 
-  const quickWorkouts: QuickWorkout[] = [
-    {
-      id: "1",
-      title: "Morning Energy Boost",
-      duration: "15 min",
-      level: "Beginner",
-      color: "#FF6B9D",
-    },
-    {
-      id: "2",
-      title: "Quick HIIT Blast",
-      duration: "12 min",
-      level: "Intermediate",
-      color: "#4ECDC4",
-    },
-    {
-      id: "3",
-      title: "Core Strength",
-      duration: "20 min",
-      level: "All Levels",
-      color: "#45B7D1",
-    },
-  ];
-
   const handleLogout = async () => {
     try {
       await logout();
     } catch (error) {
       console.error("Logout error:", error);
     }
-  };
-
-  const startWorkout = (workoutId: string) => {
-    router.push(`/workout/${workoutId}`);
   };
 
   const getUserName = () => {
@@ -264,41 +228,6 @@ export default function Dashboard() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Quick Workouts */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick Workouts</Text>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/workout")}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {quickWorkouts.map((workout) => (
-            <View key={workout.id} style={styles.workoutCard}>
-              <View style={styles.workoutInfo}>
-                <View style={styles.workoutHeader}>
-                  <Text style={styles.workoutLevel}>{workout.level}</Text>
-                </View>
-                <Text style={styles.workoutTitle}>{workout.title}</Text>
-                <View style={styles.workoutMeta}>
-                  <View style={styles.workoutMetaItem}>
-                    <Ionicons name="time-outline" size={12} color="#666" />
-                    <Text style={styles.workoutMetaText}>
-                      {workout.duration}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.startButton, { backgroundColor: workout.color }]}
-                onPress={() => startWorkout(workout.id)}
-              >
-                <Text style={styles.startButtonText}>Start</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

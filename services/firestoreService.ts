@@ -637,9 +637,7 @@ class FirestoreService {
   }
 
   async completeWorkoutSession(
-    sessionId: string,
-    duration: number
-  ): Promise<void> {
+sessionId: string, duration: number, uid: string  ): Promise<void> {
     try {
       const sessionRef = doc(db, "workoutSessions", sessionId);
       const sessionSnap = await getDoc(sessionRef);
