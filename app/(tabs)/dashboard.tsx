@@ -436,8 +436,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   statCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    backgroundColor: "hsla(195, 33%, 93%, 0.70)",
     borderRadius: 12,
+    borderColor: "#9512af",
+    borderWidth: 1,
     padding: 12,
     alignItems: "center",
     flex: 1,
@@ -480,8 +482,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   chatButton: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(49, 6, 64, 0.2)",
     borderRadius: 20,
+    borderColor: "white",
+    borderWidth: 1,
     paddingVertical: 8,
     paddingHorizontal: 16,
     flexDirection: "row",
