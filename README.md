@@ -1,39 +1,99 @@
-# Welcome to your Expo app 👋
+# FitMindAI
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is a comprehensive fitness application built with [Expo](https://expo.dev) and React Native, created using [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Workout Tracking**: Create and track custom workout plans
+- **Challenges System**: Join fitness challenges with progress tracking
+- **AI-Powered Features**: Personalized challenge generation using OpenAI, AI coach insights
+- **User Profiles**: Track fitness goals and achievements
+- **Exercise Library**: Browse exercises by body part
+- **Progress Visualization**: Charts and stats for workout history
 
-   ```bash
-   npm install
-   ```
+## Key Components
 
-2. Start the app
+1. **Tab Navigation**: Custom styled bottom tab bar with 5 main sections:
 
-   ```bash
-   npx expo start
-   ```
+   - Dashboard
+   - Workouts
+   - Workout Plans
+   - Challenges
+   - Profile
 
-In the output, you'll find options to open the app in a
+2. **Challenges System**:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   - Pre-defined and AI-generated challenges
+   - Progress tracking with visual indicators
+   - Reward system with XP points
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+3. **Workout Management**:
+   - Create custom workout plans
+   - Track workout sessions
+   - Exercise library with body part filtering
 
-## Get a fresh project
+## Screens
 
-When you're ready, run:
+### Dashboard
 
-```bash
-npm run reset-project
-```
+- Welcome message with user stats
+- Active challenge progress
+- Quick workout access
+- AI coach insights
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Workouts
+
+- Browse exercises by body part
+- Quick workout suggestions
+- Exercise details and instructions
+
+### Workout Plans
+
+- Create and manage custom workout plans
+- Start/continue workout sessions
+- Track completion progress
+
+### Challenges
+
+- Join community challenges
+- Generate personalized AI challenges
+- Track active and completed challenges
+
+### Profile
+
+- User information
+- Fitness goals
+- Settings and preferences
+- Logout functionality
+
+## Technical Stack
+
+- **Frontend**: React Native with Expo
+- **Navigation**: Expo Router with file-based routing
+- **Styling**: StyleSheet with responsive design
+- **Icons**: Expo Vector Icons
+- **AI Integration**: OpenAI API for personalized challenges and AI Coach
+- **State Management**: React hooks and context
+- **Backend**: Firebase Firestore
+
+## Get Started
+
+1. Install dependencies: `npm install`
+2. Create `.env` file with `EXPO_PUBLIC_OPENAI_API_KEY=your_api_key_here`
+3. Start the app: `npx expo start`
+
+## Project Structure
+
+app/
+(tabs)/ # Main tab navigation
+dashboard.tsx # Home screen with stats
+workout.tsx # Exercise browser
+workout-plans/ # Custom workout plans
+challenges.tsx # Fitness challenges
+profile.tsx # User profile
+components/ # Shared UI components
+hooks/ # Custom hooks
+services/ # API and Firebase services
 
 ## Learn more
 
