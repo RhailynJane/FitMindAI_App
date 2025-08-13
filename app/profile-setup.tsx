@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { Formik } from "formik";
 import { useState } from "react";
@@ -24,7 +24,9 @@ const { width } = Dimensions.get("window");
 
 const ProfileSetupSchema = Yup.object().shape({
   gender: Yup.string().required("Please select your gender"),
-  dateOfBirth: Yup.string().required("Date of birth is required"),
+  dateOfBirth: Yup.string()
+    .matches(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
+    .required("Date of birth is required"),
   weight: Yup.number()
     .min(30, "Weight must be at least 30 kg")
     .max(300, "Weight must be less than 300 kg")
@@ -44,9 +46,15 @@ interface ProfileSetupFormValues {
 
 const genderOptions = ["Male", "Female", "Other"];
 
+const formatDate = (date: Date) => {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const d = date.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
 export default function ProfileSetup() {
   const [showGenderPicker, setShowGenderPicker] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const router = useRouter();
 
@@ -57,10 +65,6 @@ export default function ProfileSetup() {
     } catch (error: any) {
       Alert.alert("Profile Setup Failed", error.message);
     }
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString();
   };
 
   return (
@@ -74,7 +78,6 @@ export default function ProfileSetup() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Top image */}
           <View style={styles.imageContainer}>
             <Image
               source={{ uri: "/placeholder.svg?height=200&width=200" }}
@@ -83,7 +86,6 @@ export default function ProfileSetup() {
             />
           </View>
 
-          {/* Heading */}
           <View style={styles.textContainer}>
             <Text style={styles.title}>Lets complete your profile</Text>
             <Text style={styles.subtitle}>
@@ -110,160 +112,169 @@ export default function ProfileSetup() {
               touched,
               isSubmitting,
               setFieldValue,
-            }) => (
-              <View style={styles.form}>
-                {/* Gender Picker */}
-                <TouchableOpacity
-                  style={styles.inputContainer}
-                  onPress={() => setShowGenderPicker(!showGenderPicker)}
-                >
-                  <Ionicons
-                    name="person-outline"
-                    size={20}
-                    color="#9512af"
-                    style={styles.inputIcon}
-                  />
-                  <Text
-                    style={[styles.input, !values.gender && styles.placeholder]}
+            }) => {
+              const onDateChange = (event: any, date?: Date) => {
+                if (date) {
+                  setSelectedDate(date);
+                  const formatted = formatDate(date);
+                  setFieldValue("dateOfBirth", formatted);
+                }
+              };
+
+              return (
+                <View style={styles.form}>
+                  <TouchableOpacity
+                    style={styles.inputContainer}
+                    onPress={() => setShowGenderPicker(!showGenderPicker)}
                   >
-                    {values.gender || "Choose Gender"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color="#666" />
-                </TouchableOpacity>
-                {touched.gender && errors.gender && (
-                  <Text style={styles.errorText}>{errors.gender}</Text>
-                )}
-                {showGenderPicker && (
-                  <View style={styles.pickerContainer}>
-                    {genderOptions.map((option) => (
-                      <TouchableOpacity
-                        key={option}
-                        style={styles.pickerOption}
-                        onPress={() => {
-                          setFieldValue("gender", option);
-                          setShowGenderPicker(false);
-                        }}
-                      >
-                        <Text style={styles.pickerOptionText}>{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {/* Date Picker */}
-                <TouchableOpacity
-                  style={styles.inputContainer}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Ionicons
-                    name="calendar-outline"
-                    size={20}
-                    color="#9512af"
-                    style={styles.inputIcon}
-                  />
-                  <Text
-                    style={[
-                      styles.input,
-                      !values.dateOfBirth && styles.placeholder,
-                    ]}
-                  >
-                    {values.dateOfBirth || "Date of Birth"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={20} color="#666" />
-                </TouchableOpacity>
-                {touched.dateOfBirth && errors.dateOfBirth && (
-                  <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
-                )}
-                {showDatePicker && (
-                  <DateTimePicker
-                    value={selectedDate}
-                    mode="date"
-                    display={Platform.OS === "ios" ? "spinner" : "default"}
-                    onChange={(event, date) => {
-                      setShowDatePicker(Platform.OS === "ios");
-                      if (date) {
-                        setSelectedDate(date);
-                        setFieldValue("dateOfBirth", formatDate(date));
-                      }
-                    }}
-                    maximumDate={new Date()}
-                    minimumDate={new Date(1900, 0, 1)}
-                  />
-                )}
-
-                {/* Weight Input */}
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="fitness-outline"
-                    size={20}
-                    color="#9512af"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Your Weight"
-                    value={values.weight}
-                    onChangeText={handleChange("weight")}
-                    onBlur={handleBlur("weight")}
-                    keyboardType="numeric"
-                  />
-                  <View style={styles.unitContainer}>
-                    <Text style={styles.unitText}>KG</Text>
-                  </View>
-                </View>
-                {touched.weight && errors.weight && (
-                  <Text style={styles.errorText}>{errors.weight}</Text>
-                )}
-
-                {/* Height Input */}
-                <View style={styles.inputContainer}>
-                  <Ionicons
-                    name="resize-outline"
-                    size={20}
-                    color="#9512af"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Your Height"
-                    value={values.height}
-                    onChangeText={handleChange("height")}
-                    onBlur={handleBlur("height")}
-                    keyboardType="numeric"
-                  />
-                  <View style={styles.unitContainer}>
-                    <Text style={styles.unitText}>CM</Text>
-                  </View>
-                </View>
-                {touched.height && errors.height && (
-                  <Text style={styles.errorText}>{errors.height}</Text>
-                )}
-
-                {/* Submit Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.nextButton,
-                    isSubmitting && styles.disabledButton,
-                  ]}
-                  onPress={() => handleSubmit()}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <>
-                      <Text style={styles.nextButtonText}>Next</Text>
-                      <Ionicons
-                        name="arrow-forward"
-                        size={20}
-                        color="white"
-                        style={styles.buttonIcon}
-                      />
-                    </>
+                    <Ionicons
+                      name="person-outline"
+                      size={20}
+                      color="#9512af"
+                      style={styles.inputIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.input,
+                        !values.gender && styles.placeholder,
+                      ]}
+                    >
+                      {values.gender || "Choose Gender"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color="#666" />
+                  </TouchableOpacity>
+                  {touched.gender && errors.gender && (
+                    <Text style={styles.errorText}>{errors.gender}</Text>
                   )}
-                </TouchableOpacity>
-              </View>
-            )}
+                  {showGenderPicker && (
+                    <View style={styles.pickerContainer}>
+                      {genderOptions.map((option) => (
+                        <TouchableOpacity
+                          key={option}
+                          style={styles.pickerOption}
+                          onPress={() => {
+                            setFieldValue("gender", option);
+                            setShowGenderPicker(false);
+                          }}
+                        >
+                          <Text style={styles.pickerOptionText}>{option}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.inputContainer}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={20}
+                      color="#9512af"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={[styles.input, !values.dateOfBirth && styles.placeholder]}
+                      placeholder="YYYY-MM-DD"
+                      value={values.dateOfBirth}
+                      onChangeText={handleChange("dateOfBirth")}
+                      onBlur={handleBlur("dateOfBirth")}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                    <TouchableOpacity
+                      onPress={() => {
+                        DateTimePickerAndroid.open({
+                          value: selectedDate,
+                          onChange: (event, date) => {
+                            if (date) {
+                              setSelectedDate(date);
+                              setFieldValue("dateOfBirth", formatDate(date));
+                            }
+                          },
+                          mode: "date",
+                          is24Hour: true,
+                          display: "default",
+                          maximumDate: new Date(),
+                          minimumDate: new Date(1900, 0, 1),
+                        });
+                      }}
+                      style={{ paddingHorizontal: 10 }}
+                    >
+                      <Ionicons name="calendar-outline" size={24} color="#9512af" />
+                    </TouchableOpacity>
+                  </View>
+                  {touched.dateOfBirth && errors.dateOfBirth && (
+                    <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
+                  )}
+
+                  <View style={styles.inputContainer}>
+                    <Ionicons
+                      name="fitness-outline"
+                      size={20}
+                      color="#9512af"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Your Weight"
+                      value={values.weight}
+                      onChangeText={handleChange("weight")}
+                      onBlur={handleBlur("weight")}
+                      keyboardType="numeric"
+                    />
+                    <View style={styles.unitContainer}>
+                      <Text style={styles.unitText}>KG</Text>
+                    </View>
+                  </View>
+                  {touched.weight && errors.weight && (
+                    <Text style={styles.errorText}>{errors.weight}</Text>
+                  )}
+
+                  <View style={styles.inputContainer}>
+                    <Ionicons
+                      name="resize-outline"
+                      size={20}
+                      color="#9512af"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Your Height"
+                      value={values.height}
+                      onChangeText={handleChange("height")}
+                      onBlur={handleBlur("height")}
+                      keyboardType="numeric"
+                    />
+                    <View style={styles.unitContainer}>
+                      <Text style={styles.unitText}>CM</Text>
+                    </View>
+                  </View>
+                  {touched.height && errors.height && (
+                    <Text style={styles.errorText}>{errors.height}</Text>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.nextButton,
+                      isSubmitting && styles.disabledButton,
+                    ]}
+                    onPress={() => handleSubmit()}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <>
+                        <Text style={styles.nextButtonText}>Next</Text>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={20}
+                          color="white"
+                          style={styles.buttonIcon}
+                        />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            }}
           </Formik>
         </ScrollView>
       </KeyboardAvoidingView>
