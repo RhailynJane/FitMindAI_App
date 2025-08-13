@@ -224,7 +224,6 @@ export default function WorkoutScreen() {
         {/* Welcome area with screen title and contextual subtitle */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Workouts</Text>
-          <Text style={styles.headerSubtitle}>Choose your workout focus</Text>
         </View>
 
         {/* Quick Workout Section */}
@@ -318,18 +317,20 @@ const styles = StyleSheet.create({
 
   // Header section with white background for emphasis
   header: {
-    backgroundColor: "white",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 16,
+    backgroundColor: "white",
     marginBottom: 8,
   },
 
   // Main page title styling
   headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "600",
     color: "#333",
-    marginBottom: 4,
   },
 
   // Contextual subtitle below main title

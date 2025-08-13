@@ -312,17 +312,19 @@ const styles = StyleSheet.create({
 
   // Header styling with bottom border for separation
   header: {
-    backgroundColor: "white",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    backgroundColor: "white",
+    marginBottom: 8,
   },
 
   // Header title text styling with proper hierarchy
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 18,
+    fontWeight: "600",
     color: "#333",
   },
 

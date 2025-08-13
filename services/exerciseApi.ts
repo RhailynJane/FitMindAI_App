@@ -164,6 +164,13 @@ class ExerciseApi {
     }
   }
 
+  async getExerciseGifUrl(
+    exerciseId: string,
+    resolution = "360"
+  ): Promise<string> {
+    return `${BASE_URL}/image?exerciseId=${exerciseId}&resolution=${resolution}&rapidapi-key=${EXERCISEDB_API_KEY}`;
+  }
+
   // Utility to determine difficulty level based on equipment
   private getDifficulty(equipment: string): string {
     const bodyWeightEquipment = ["body weight", "assisted"];

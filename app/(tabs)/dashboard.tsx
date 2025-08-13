@@ -25,14 +25,6 @@ import {
 
 const { width } = Dimensions.get("window");
 
-interface QuickWorkout {
-  id: string;
-  title: string;
-  duration: string;
-  level: string;
-  color: string;
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   const { logout, getUserProfile } = useAuthFunctions();
@@ -76,12 +68,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    console.log("Setting up real-time listeners for user:", user.uid);
-
     const unsubscribeStats = firestoreService.subscribeToUserStats(
       user.uid,
       (stats) => {
-        console.log("Stats updated:", stats);
         setUserStats(stats);
       }
     );
@@ -89,41 +78,15 @@ export default function Dashboard() {
     const unsubscribeChallenges = firestoreService.subscribeToUserChallenges(
       user.uid,
       (challenges) => {
-        console.log("Challenges updated:", challenges.length);
         setUserChallenges(challenges);
       }
     );
 
     return () => {
-      console.log("Cleaning up real-time listeners");
       unsubscribeStats();
       unsubscribeChallenges();
     };
   }, [user]);
-
-  const quickWorkouts: QuickWorkout[] = [
-    {
-      id: "1",
-      title: "Morning Energy Boost",
-      duration: "15 min",
-      level: "Beginner",
-      color: "#FF6B9D",
-    },
-    {
-      id: "2",
-      title: "Quick HIIT Blast",
-      duration: "12 min",
-      level: "Intermediate",
-      color: "#4ECDC4",
-    },
-    {
-      id: "3",
-      title: "Core Strength",
-      duration: "20 min",
-      level: "All Levels",
-      color: "#45B7D1",
-    },
-  ];
 
   const handleLogout = async () => {
     try {
@@ -131,10 +94,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Logout error:", error);
     }
-  };
-
-  const startWorkout = (workoutId: string) => {
-    router.push(`/workout/${workoutId}`);
   };
 
   const getUserName = () => {
@@ -192,37 +151,6 @@ export default function Dashboard() {
             <Text style={styles.welcomeSubtitle}>
               Another day, another chance to become stronger.
             </Text>
-            <Text style={styles.welcomeDescription}>
-              Your journey matters - your consistency is inspiring
-            </Text>
-
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Ionicons name="fitness-outline" size={24} color="#9512af" />
-                <Text style={styles.statValue}>
-                  {userStats?.weeklyWorkouts || 0}
-                </Text>
-                <Text style={styles.statLabel}>Workouts</Text>
-                <Text style={styles.statPeriod}>this week</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="time-outline" size={24} color="#9512af" />
-                <Text style={styles.statValue}>
-                  {userStats?.totalHours?.toFixed(1) || "0.0"}
-                </Text>
-                <Text style={styles.statLabel}>Hours</Text>
-              </View>
-
-              <View style={styles.statCard}>
-                <Ionicons name="trophy-outline" size={24} color="#9512af" />
-                <Text style={styles.statValue}>
-                  Level {userStats?.currentLevel || 1}
-                </Text>
-                <Text style={styles.statLabel}>Progress</Text>
-              </View>
-            </View>
           </LinearGradient>
         </View>
 
@@ -236,7 +164,7 @@ export default function Dashboard() {
             <Text style={styles.aiInsightsText}>
               {userStats?.totalWorkouts === 0
                 ? "Welcome to your fitness journey! Start with a beginner workout to build your foundation."
-                : `Great job on your consistency! You've completed ${userStats?.totalWorkouts} workouts. Keep up the momentum!`}
+                : `Great job on your consistency! Keep up the momentum!`}
             </Text>
             <TouchableOpacity
               style={styles.chatButton}
@@ -300,75 +228,6 @@ export default function Dashboard() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* Quick Workouts */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Quick Workouts</Text>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/workout")}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          {quickWorkouts.map((workout) => (
-            <View key={workout.id} style={styles.workoutCard}>
-              <View style={styles.workoutInfo}>
-                <View style={styles.workoutHeader}>
-                  <Text style={styles.workoutLevel}>{workout.level}</Text>
-                </View>
-                <Text style={styles.workoutTitle}>{workout.title}</Text>
-                <View style={styles.workoutMeta}>
-                  <View style={styles.workoutMetaItem}>
-                    <Ionicons name="time-outline" size={12} color="#666" />
-                    <Text style={styles.workoutMetaText}>
-                      {workout.duration}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.startButton, { backgroundColor: workout.color }]}
-                onPress={() => startWorkout(workout.id)}
-              >
-                <Text style={styles.startButtonText}>Start</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <View style={styles.activityCard}>
-            {userStats?.totalWorkouts === 0 ? (
-              <View style={styles.noActivityContainer}>
-                <Ionicons name="fitness-outline" size={48} color="#ccc" />
-                <Text style={styles.noActivityTitle}>No workouts yet</Text>
-                <Text style={styles.noActivityText}>
-                  Start your first workout to see your activity here!
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.activityItem}>
-                <View style={styles.activityIcon}>
-                  <Ionicons name="fitness-outline" size={20} color="#9512af" />
-                </View>
-                <View style={styles.activityInfo}>
-                  <Text style={styles.activityTitle}>
-                    {`${userStats?.totalWorkouts} workout${
-                      userStats?.totalWorkouts !== 1 ? "s" : ""
-                    } completed`}
-                  </Text>
-                  <Text style={styles.activitySubtitle}>
-                    {userStats?.lastWorkoutDate
-                      ? `Last workout: ${userStats.lastWorkoutDate.toLocaleDateString()}`
-                      : "Keep up the great work!"}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -443,20 +302,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginTop: 4,
-  },
   statLabel: {
     fontSize: 12,
     color: "#666",
     marginTop: 2,
-  },
-  statPeriod: {
-    fontSize: 10,
-    color: "#666",
   },
   aiInsightsCard: {
     marginHorizontal: 20,

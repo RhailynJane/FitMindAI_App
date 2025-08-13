@@ -1,7 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { Formik } from "formik";
-import { useState } from "react";
+// Import necessary libraries and components
+import { Ionicons } from "@expo/vector-icons"; // For icons
+import { useRouter } from "expo-router"; // For navigation
+import { Formik } from "formik"; // Form handling library
+import { useState } from "react"; // React hooks
 import {
   ActivityIndicator,
   Alert,
@@ -14,10 +15,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import * as Yup from "yup";
-import { useAuthFunctions } from "../hooks/useAuthFunctions";
+} from "react-native"; // Core React Native components
+import * as Yup from "yup"; // Form validation library
+import { useAuthFunctions } from "../hooks/useAuthFunctions"; // Custom auth hook
 
+// Define validation schema using Yup
 const SignUpSchema = Yup.object().shape({
   firstName: Yup.string()
     .min(2, "First name must be at least 2 characters")
@@ -37,6 +39,7 @@ const SignUpSchema = Yup.object().shape({
   ),
 });
 
+// Define TypeScript interface for form values
 interface SignUpFormValues {
   firstName: string;
   lastName: string;
@@ -46,56 +49,70 @@ interface SignUpFormValues {
 }
 
 export default function SignUp() {
+  // State for password visibility toggle
   const [showPassword, setShowPassword] = useState(false);
+
+  // Get signUp function from auth hook
   const { signUp } = useAuthFunctions();
+
+  // Initialize router for navigation
   const router = useRouter();
 
+  /**
+   * Handle form submission
+   * @param values - Form values
+   * @param param1 - Formik helpers
+   */
   const handleSignUp = async (
     values: SignUpFormValues,
-    { setSubmitting }: any
+    { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }
   ) => {
     try {
+      // Call signUp function with form values
       await signUp(
         values.email,
         values.password,
         values.firstName,
         values.lastName
       );
+
+      // Navigate to profile setup on success
       router.push("/profile-setup");
     } catch (error: any) {
+      // Show error alert if signup fails
       Alert.alert(
         "Sign Up Failed",
         error.message || "An unknown error occurred. Please try again.",
-        [
-          {
-            text: "OK",
-            onPress: () => setSubmitting(false),
-          },
-        ]
+        [{ text: "OK", onPress: () => setSubmitting(false) }]
       );
     } finally {
+      // Ensure submitting state is reset
       setSubmitting(false);
     }
   };
 
   return (
+    // SafeAreaView ensures content isn't hidden by device notches
     <SafeAreaView style={styles.container}>
+      {/* KeyboardAvoidingView prevents keyboard from covering inputs */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
       >
+        {/* ScrollView allows scrolling when content exceeds screen */}
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="handled" // Ensures keyboard behaves properly
         >
-          {/* Header */}
+          {/* Header section */}
           <View style={styles.header}>
             <Text style={styles.greeting}>Hey there,</Text>
             <Text style={styles.title}>Create an Account</Text>
           </View>
 
+          {/* Formik form wrapper */}
           <Formik
             initialValues={{
               firstName: "",
@@ -106,6 +123,7 @@ export default function SignUp() {
             }}
             validationSchema={SignUpSchema}
             onSubmit={handleSignUp}
+            validateOnBlur={true}
           >
             {({
               handleChange,
@@ -118,7 +136,7 @@ export default function SignUp() {
               setFieldValue,
             }) => (
               <View style={styles.form}>
-                {/* First Name */}
+                {/* First Name Input */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="person-outline"
@@ -129,17 +147,21 @@ export default function SignUp() {
                   <TextInput
                     style={styles.input}
                     placeholder="First Name"
+                    placeholderTextColor="#999"
                     value={values.firstName}
                     onChangeText={handleChange("firstName")}
                     onBlur={handleBlur("firstName")}
                     autoCapitalize="words"
+                    autoCorrect={false}
+                    editable={!isSubmitting}
                   />
                 </View>
+                {/* First Name Error */}
                 {touched.firstName && errors.firstName && (
                   <Text style={styles.errorText}>{errors.firstName}</Text>
                 )}
 
-                {/* Last Name */}
+                {/* Last Name Input */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="person-outline"
@@ -150,17 +172,21 @@ export default function SignUp() {
                   <TextInput
                     style={styles.input}
                     placeholder="Last Name"
+                    placeholderTextColor="#999"
                     value={values.lastName}
                     onChangeText={handleChange("lastName")}
                     onBlur={handleBlur("lastName")}
                     autoCapitalize="words"
+                    autoCorrect={false}
+                    editable={!isSubmitting}
                   />
                 </View>
+                {/* Last Name Error */}
                 {touched.lastName && errors.lastName && (
                   <Text style={styles.errorText}>{errors.lastName}</Text>
                 )}
 
-                {/* Email */}
+                {/* Email Input */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="mail-outline"
@@ -171,19 +197,22 @@ export default function SignUp() {
                   <TextInput
                     style={styles.input}
                     placeholder="Email"
+                    placeholderTextColor="#999"
                     value={values.email}
                     onChangeText={handleChange("email")}
                     onBlur={handleBlur("email")}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
+                    editable={!isSubmitting}
                   />
                 </View>
+                {/* Email Error */}
                 {touched.email && errors.email && (
                   <Text style={styles.errorText}>{errors.email}</Text>
                 )}
 
-                {/* Password */}
+                {/* Password Input */}
                 <View style={styles.inputContainer}>
                   <Ionicons
                     name="lock-closed-outline"
@@ -194,15 +223,19 @@ export default function SignUp() {
                   <TextInput
                     style={styles.input}
                     placeholder="Password"
+                    placeholderTextColor="#999"
                     value={values.password}
                     onChangeText={handleChange("password")}
                     onBlur={handleBlur("password")}
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
+                    editable={!isSubmitting}
                   />
+                  {/* Password Visibility Toggle */}
                   <TouchableOpacity
                     style={styles.eyeIcon}
                     onPress={() => setShowPassword(!showPassword)}
+                    disabled={isSubmitting}
                   >
                     <Ionicons
                       name={showPassword ? "eye-outline" : "eye-off-outline"}
@@ -211,16 +244,23 @@ export default function SignUp() {
                     />
                   </TouchableOpacity>
                 </View>
+                {/* Password Error */}
                 {touched.password && errors.password && (
                   <Text style={styles.errorText}>{errors.password}</Text>
                 )}
 
-                {/* Terms */}
+                {/* Password Requirements Hint */}
+                <Text style={styles.passwordHint}>
+                  Password must be at least 6 characters
+                </Text>
+
+                {/* Terms Checkbox */}
                 <TouchableOpacity
                   style={styles.checkboxContainer}
                   onPress={() =>
                     setFieldValue("acceptTerms", !values.acceptTerms)
                   }
+                  disabled={isSubmitting}
                 >
                   <View
                     style={[
@@ -236,11 +276,12 @@ export default function SignUp() {
                     By continuing you accept our Privacy Policy and Term of Use
                   </Text>
                 </TouchableOpacity>
+                {/* Terms Error */}
                 {touched.acceptTerms && errors.acceptTerms && (
                   <Text style={styles.errorText}>{errors.acceptTerms}</Text>
                 )}
 
-                {/* Submit */}
+                {/* Register Button */}
                 <TouchableOpacity
                   style={[
                     styles.registerButton,
@@ -248,6 +289,7 @@ export default function SignUp() {
                   ]}
                   onPress={() => handleSubmit()}
                   disabled={isSubmitting}
+                  activeOpacity={0.8}
                 >
                   {isSubmitting ? (
                     <ActivityIndicator color="white" />
@@ -256,12 +298,15 @@ export default function SignUp() {
                   )}
                 </TouchableOpacity>
 
-                {/* Link */}
+                {/* Login Link */}
                 <View style={styles.signInContainer}>
                   <Text style={styles.signInText}>
                     Already have an account?{" "}
                   </Text>
-                  <TouchableOpacity onPress={() => router.push("/signin")}>
+                  <TouchableOpacity
+                    onPress={() => router.push("/signin")}
+                    disabled={isSubmitting}
+                  >
                     <Text style={styles.signInLink}>Login</Text>
                   </TouchableOpacity>
                 </View>
@@ -274,36 +319,83 @@ export default function SignUp() {
   );
 }
 
+// Stylesheet
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#efdff1" },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 30,
-    paddingTop: 60,
-    paddingBottom: 40,
+  // Main container style
+  container: {
+    flex: 1,
+    backgroundColor: "#efdff1", // Light purple background
   },
-  header: { marginBottom: 40, alignItems: "center" },
-  greeting: { fontSize: 16, color: "#666", marginBottom: 5 },
-  title: { fontSize: 20, fontWeight: "bold", color: "#333" },
-  form: { marginBottom: 30 },
+
+  // ScrollView content container
+  scrollContent: {
+    flexGrow: 1, // Allows content to expand
+    paddingHorizontal: 30, // Horizontal padding
+    paddingTop: 60, // Top padding
+    paddingBottom: 40, // Bottom padding
+  },
+
+  // Header styles
+  header: {
+    marginBottom: 40,
+    alignItems: "center",
+  },
+  greeting: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 5,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+  },
+
+  // Form container
+  form: {
+    marginBottom: 30,
+  },
+
+  // Input container styles
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f7f8f8",
+    backgroundColor: "#f7f8f8", // Light gray background
     borderRadius: 14,
     paddingHorizontal: 15,
     marginBottom: 15,
     height: 60,
   },
-  inputIcon: { marginRight: 15 },
-  input: { flex: 1, fontSize: 16, color: "#333" },
-  eyeIcon: { padding: 5 },
+  inputIcon: {
+    marginRight: 15,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: "#333",
+  },
+  eyeIcon: {
+    padding: 5,
+  },
+
+  // Error text style
   errorText: {
-    color: "#ff4444",
+    color: "#ff4444", // Red color for errors
     fontSize: 12,
     marginBottom: 10,
     marginLeft: 15,
+    marginTop: -10, // Pull error closer to input
   },
+
+  // Password hint text
+  passwordHint: {
+    color: "#666",
+    fontSize: 12,
+    marginBottom: 15,
+    marginLeft: 15,
+  },
+
+  // Checkbox styles
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -320,10 +412,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  checkedCheckbox: { backgroundColor: "#9512af", borderColor: "#9512af" },
-  checkboxText: { flex: 1, fontSize: 12, color: "#666", lineHeight: 18 },
+  checkedCheckbox: {
+    backgroundColor: "#9512af", // Purple when checked
+    borderColor: "#9512af",
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#666",
+    lineHeight: 18,
+  },
+
+  // Register button styles
   registerButton: {
-    backgroundColor: "#9512af",
+    backgroundColor: "#9512af", // Purple button
     borderRadius: 25,
     height: 60,
     alignItems: "center",
@@ -333,15 +435,30 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 5, // Android shadow
   },
-  disabledButton: { opacity: 0.7 },
-  registerButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  disabledButton: {
+    opacity: 0.7, // Dim when disabled
+  },
+  registerButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // Sign in link styles
   signInContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
-  signInText: { color: "#666", fontSize: 14 },
-  signInLink: { color: "#c58bf2", fontSize: 14, fontWeight: "600" },
+  signInText: {
+    color: "#666",
+    fontSize: 14,
+  },
+  signInLink: {
+    color: "#c58bf2", // Light purple link
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });

@@ -1,223 +1,380 @@
-"use client"; // Ensures the component is rendered client-side (relevant in SSR setups)
-
-// Icon pack from Expo
 import { Ionicons } from "@expo/vector-icons";
-
-// Navigation + route param hooks from Expo Router
 import { useLocalSearchParams, useRouter } from "expo-router";
-
-// React utilities
 import { useEffect, useState } from "react";
-
-// React Native components
 import {
-  SafeAreaView, // Ensures content doesn't go into notches/status bar
-  StyleSheet, // Used for defining styles
-  Text, // Text display component
-  TouchableOpacity, // Pressable component
-  View, // Layout component
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-
-// Custom auth hook to get current user
 import { useAuth } from "../hooks/useAuth";
-
-// Firestore service for interacting with workout session data
 import { firestoreService } from "../services/firestoreService";
 
-// Define the expected shape of workout stats
 interface WorkoutStats {
-  duration: number; // Duration in minutes
-  calories: number; // Calories burned
-  exercises: number; // Number of exercises completed
+  duration: number;
+  calories: number;
+  exercises: number;
+  workoutName: string;
+  workoutCategory: string;
+  startTime?: Date;
 }
 
-// Main component for the workout completion screen
 export default function WorkoutCompleteScreen() {
-  const router = useRouter(); // Navigation handler
-  const { user } = useAuth(); // Get the current logged-in user
-  const params = useLocalSearchParams(); // Access route params from URL
+  const router = useRouter();
+  const { user } = useAuth();
+  const params = useLocalSearchParams();
 
-  // Local state to store workout stats
-  const [stats, setStats] = useState<WorkoutStats>({
-    duration: 15, // Default 15 minutes
-    calories: 150, // Default 150 calories
-    exercises: 4, // Default 4 exercises
-  });
+  const [stats, setStats] = useState<WorkoutStats | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If params have data, use them to set the stats
-    if (params.duration) {
-      setStats({
-        duration: Number.parseInt(params.duration as string) || 15,
-        calories: Number.parseInt(params.calories as string) || 150,
-        exercises: Number.parseInt(params.exercises as string) || 4,
-      });
-    }
+    let isMounted = true;
 
-    // If sessionId exists and user is logged in, complete the session in Firestore
-    if (params.sessionId && user) {
-      completeWorkoutSession();
-    }
-  }, [params, user]);
+    const loadWorkoutSession = async () => {
+      try {
+        if (!params.sessionId || !user?.uid) {
+          if (isMounted) setError("Missing session ID or user");
+          return;
+        }
 
-  // Function to mark workout session as completed in Firestore
-  const completeWorkoutSession = async () => {
-    try {
-      if (params.sessionId) {
-        console.log("Completing workout session:", params.sessionId);
-        await firestoreService.completeWorkoutSession(
-          params.sessionId as string,
-          stats.duration
+        if (isMounted) setIsLoading(true);
+
+        const sessionId = 
+          typeof params.sessionId === "string" 
+            ? params.sessionId 
+            : params.sessionId?.[0] || "";
+
+        const session = await firestoreService.getWorkoutSession(
+          sessionId,
+          user.uid
         );
-        console.log("Workout session completed successfully");
+
+        if (!isMounted) return;
+
+        if (!session) {
+          setError("Workout session not found");
+          return;
+        }
+
+        const now = new Date();
+        const startTime = session.startTime;
+        const durationMinutes = (now.getTime() - startTime.getTime()) / (1000 * 60);
+
+        if (isMounted) {
+          setStats({
+            duration: durationMinutes,
+            calories: Math.round(durationMinutes * 10),
+            exercises: session.workout?.exercises?.length || 0,
+            workoutName: session.workout?.name || "Custom Workout",
+            workoutCategory: session.workout?.category || "General",
+            startTime,
+          });
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("Error loading workout session:", error);
+          setError("Failed to load workout details");
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
+    };
+
+    loadWorkoutSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params.sessionId, user?.uid]);
+
+  const completeWorkoutSession = async () => {
+    if (!params.sessionId || !stats || !user?.uid || isSaved) return;
+
+    try {
+      setIsLoading(true);
+      const sessionId = 
+        typeof params.sessionId === "string" 
+          ? params.sessionId 
+          : params.sessionId?.[0] || "";
+      
+      await firestoreService.completeWorkoutSession(
+        sessionId,
+        stats.duration,
+        user.uid
+      );
+      setIsSaved(true);
     } catch (error) {
       console.error("Error completing workout session:", error);
+      Alert.alert(
+        "Error", 
+        "Failed to save workout. Your stats are still recorded locally."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Format duration from decimal minutes to mm:ss format
   const formatDuration = (minutes: number) => {
-    const mins = Math.floor(minutes); // Get whole minutes
-    const secs = Math.floor((minutes - mins) * 60); // Get remaining seconds
-    return `${mins}:${secs.toString().padStart(2, "0")}`; // Pad seconds with 0 if needed
+    const mins = Math.floor(minutes);
+    const secs = Math.floor((minutes - mins) * 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  const handleShare = async () => {
+    if (!stats) return;
+
+    try {
+      const message = `I just completed ${stats.workoutName} (${
+        stats.workoutCategory
+      })!
+⏱️ Duration: ${formatDuration(stats.duration)}
+🔥 Calories burned: ${stats.calories}
+💪 Exercises completed: ${stats.exercises}`;
+
+      await Share.share({
+        message,
+        title: "My Workout Results",
+      });
+    } catch (error) {
+      console.error("Error sharing:", error);
+    }
+  };
+
+  const handleDone = async () => {
+    if (!isSaved) {
+      await completeWorkoutSession();
+    }
+    router.replace({
+      pathname: "/(tabs)/dashboard",
+      params: { refresh: new Date().getTime() },
+    });
+  };
+
+  if (error || !stats) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          {error ? (
+            <>
+              <Ionicons name="warning-outline" size={48} color="#ff4444" />
+              <Text style={styles.errorText}>{error}</Text>
+            </>
+          ) : (
+            <ActivityIndicator size="large" color="#9512af" />
+          )}
+          <Text style={styles.loadingText}>
+            {error ? "Couldn't load workout" : "Loading your results..."}
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => router.replace("/(tabs)/dashboard")}
+          >
+            <Text style={styles.retryButtonText}>Return to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Outer container */}
       <View style={styles.content}>
-        {/* Main inner content */}
-        {/* Header with close (X) button */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/(tabs)/dashboard")}>
-            <Ionicons name="close" size={24} color="#333" />
+          <TouchableOpacity 
+            onPress={handleDone}
+            disabled={isLoading}
+          >
+            <Ionicons 
+              name="close" 
+              size={24} 
+              color={isLoading ? "#ccc" : "#333"} 
+            />
           </TouchableOpacity>
         </View>
-        {/* Completion confirmation section */}
+
         <View style={styles.completedContainer}>
           <View style={styles.completedIconContainer}>
-            <Ionicons name="checkmark-circle" size={80} color="#9512af" />
+            <Ionicons
+              name={isSaved ? "checkmark-circle" : "timer-outline"}
+              size={80}
+              color={isSaved ? "#4CAF50" : "#9512af"}
+            />
+            {isLoading && (
+              <ActivityIndicator
+                style={styles.loadingIndicator}
+                size="small"
+                color="#9512af"
+              />
+            )}
           </View>
-          <Text style={styles.completedTitle}>Workout Completed!</Text>
-          <Text style={styles.completedSubtitle}>
-            You&#39;ve crushed it today!
+          <Text style={styles.completedTitle}>
+            {isLoading ? "Saving..." : "Workout Completed!"}
           </Text>
+          <Text style={styles.completedSubtitle}>
+            {stats.workoutName} • {stats.workoutCategory}
+          </Text>
+          {stats.startTime && (
+            <Text style={styles.timeText}>
+              {stats.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} •{" "}
+              {stats.startTime.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+            </Text>
+          )}
         </View>
-        {/* Workout stats summary */}
+
         <View style={styles.statsContainer}>
-          {/* Duration Stat */}
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={24} color="#9512af" />
+            <Ionicons name="time-outline" size={28} color="#9512af" />
             <Text style={styles.statValue}>
               {formatDuration(stats.duration)}
             </Text>
             <Text style={styles.statLabel}>Duration</Text>
           </View>
 
-          {/* Calories Stat */}
           <View style={styles.statItem}>
-            <Ionicons name="flame-outline" size={24} color="#9512af" />
+            <Ionicons name="flame-outline" size={28} color="#9512af" />
             <Text style={styles.statValue}>{stats.calories}</Text>
             <Text style={styles.statLabel}>Calories</Text>
           </View>
 
-          {/* Exercises Stat */}
           <View style={styles.statItem}>
-            <Ionicons name="fitness-outline" size={24} color="#9512af" />
+            <Ionicons name="barbell-outline" size={28} color="#9512af" />
             <Text style={styles.statValue}>{stats.exercises}</Text>
             <Text style={styles.statLabel}>Exercises</Text>
           </View>
         </View>
-        {/* Share button */}
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={() => {
-            console.log("Share workout"); // Share logic to be implemented
-          }}
-        >
-          <Ionicons
-            name="share-social-outline"
-            size={20}
-            color="white"
-            style={styles.buttonIcon}
-          />
-          <Text style={styles.shareButtonText}>Share Results</Text>
-        </TouchableOpacity>
-        {/* Done button to go back to dashboard */}
-        <TouchableOpacity
-          style={styles.doneButton}
-          onPress={() => router.push("/(tabs)/dashboard")}
-        >
-          <Text style={styles.doneButtonText}>Done</Text>
-        </TouchableOpacity>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.shareButton,
+              isLoading && styles.disabledButton
+            ]}
+            onPress={handleShare}
+            disabled={isLoading}
+          >
+            <Ionicons
+              name="share-social-outline"
+              size={20}
+              color="white"
+              style={styles.buttonIcon}
+            />
+            <Text style={styles.shareButtonText}>Share Results</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.doneButton,
+              isLoading && styles.disabledButton
+            ]}
+            onPress={handleDone}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#9512af" />
+            ) : (
+              <Text style={styles.doneButtonText}>
+                {isSaved ? "Return Home" : "Save & Finish"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
-// StyleSheet for all components
 const styles = StyleSheet.create({
   container: {
-    flex: 1, // Fill full height
-    backgroundColor: "#efdff1", // Soft purple background
+    flex: 1,
+    backgroundColor: "#f8f1f9",
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24, // Horizontal padding for content
-    paddingTop: 16, // Top padding
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   header: {
-    alignItems: "flex-end", // Align close button to top-right
+    alignItems: "flex-end",
+    marginBottom: 10,
   },
   completedContainer: {
-    alignItems: "center", // Center check icon and text
-    marginTop: 60,
-    marginBottom: 60,
+    alignItems: "center",
+    marginVertical: 30,
   },
   completedIconContainer: {
-    marginBottom: 24, // Space between icon and title
+    marginBottom: 20,
+    position: "relative",
+  },
+  loadingIndicator: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
   },
   completedTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#2d2d2d",
+    marginBottom: 6,
+    textAlign: "center",
   },
   completedSubtitle: {
-    fontSize: 16,
-    color: "#666",
+    fontSize: 18,
+    color: "#555",
+    textAlign: "center",
+    marginBottom: 6,
+    fontWeight: "500",
+  },
+  timeText: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
   },
   statsContainer: {
-    flexDirection: "row", // Horizontal layout for stats
-    justifyContent: "space-around", // Even spacing
-    marginBottom: 60,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: 30,
+    paddingHorizontal: 20,
   },
   statItem: {
-    alignItems: "center", // Center each stat icon + text
+    alignItems: "center",
+    minWidth: 100,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-    marginTop: 8,
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#2d2d2d",
+    marginVertical: 6,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: "#666",
+    fontWeight: "500",
+  },
+  buttonContainer: {
+    marginTop: 20,
   },
   shareButton: {
-    backgroundColor: "#9512af", // Purple button
+    backgroundColor: "#9512af",
     borderRadius: 25,
-    height: 56,
-    flexDirection: "row", // Icon + text side-by-side
+    height: 50,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 15,
+    elevation: 3,
   },
   buttonIcon: {
-    marginRight: 8, // Space between icon and text
+    marginRight: 10,
   },
   shareButtonText: {
     color: "white",
@@ -225,16 +382,52 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   doneButton: {
-    backgroundColor: "transparent", // No fill color
+    backgroundColor: "white",
     borderWidth: 2,
-    borderColor: "#9512af", // Purple border
+    borderColor: "#9512af",
     borderRadius: 25,
-    height: 56,
+    height: 50,
     alignItems: "center",
     justifyContent: "center",
+    elevation: 2,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   doneButtonText: {
-    color: "#9512af", // Purple text
+    color: "#9512af",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 30,
+  },
+  errorText: {
+    color: "#ff4444",
+    fontSize: 18,
+    fontWeight: "600",
+    marginVertical: 10,
+    textAlign: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+    marginVertical: 10,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    backgroundColor: "#9512af",
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: "white",
     fontSize: 16,
     fontWeight: "600",
   },
